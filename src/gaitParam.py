@@ -3,9 +3,10 @@ from matplotlib.pyplot import step
 import numpy as np
 
 
-def get_speed(total_time):
+def get_speed(sacrum_arr, total_time):
     # Calculate the total distance covered by both legs
-    total_distance = 0.0
+    total_distance = np.sum(np.linalg.norm(np.diff(sacrum_arr, axis=0), axis=1))
+    speed = total_distance / total_time
     return speed
 
 def get_cadence(L_heel_strikes, R_heel_strikes, total_time):
@@ -160,9 +161,10 @@ def get_swing_time(L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs, frame
 
 def compute_gait_params(trial_name, session_name):
     data = np.load(f"D:\\python_scripts\\Gait_Analysis\\data\\GaitEvents\\{session_name}\\{trial_name}_GaitEvents.npz")
-    L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr = data['LHarr'], data['LTOarr'], data['RHarr'], data['RTOarr']
-    L_heel_vX, L_toe_vX, R_heel_vX, R_toe_vX = data['LHvX'], data['LTOvX'], data['RHvX'], data['RTOvX']
+    L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr = data['LHarr'], data['LTarr'], data['RHarr'], data['RTarr']
+    L_heel_vX, L_toe_vX, R_heel_vX, R_toe_vX = data['LHvX'], data['LTvX'], data['RHvX'], data['RTvX']
     L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs = data['LHS'], data['LTO'], data['RHS'], data['RTO']
+    sacrum_arr = data['sacrum_arr']
     frame_rate = data['frame_rate']
     start_frame = data['start_frame']
 
@@ -172,7 +174,7 @@ def compute_gait_params(trial_name, session_name):
     total_time_right = ((R_heel_strikes[-1] - R_heel_strikes[0]) + 1) / frame_rate
 
     # Compute each gait parameter
-    speed                                                   = get_speed(L_heel_strikes, R_heel_strikes, total_time)
+    speed                                                   = get_speed(sacrum_arr, total_time)
     cadence                                                 = get_cadence(L_heel_strikes, R_heel_strikes, total_time)
     avg_step_length, L_step_lengths, R_step_lengths, avg_step_width, L_step_widths, R_step_widths = get_step_length_width(L_heel_arr-start_frame, R_heel_arr-start_frame, L_heel_strikes, R_heel_strikes)
     avg_step_time, L_step_times, R_step_times               = get_step_time(L_heel_strikes, R_heel_strikes, frame_rate)
