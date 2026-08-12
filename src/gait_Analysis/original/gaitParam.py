@@ -4,7 +4,7 @@ import numpy as np
 
 
 def get_speed(sacrum_arr, total_time):
-    # Calculate the total distance covered by both legs
+    # Calculate the total cumulative sacrum displacements as path length
     total_distance = np.sum(np.linalg.norm(np.diff(sacrum_arr, axis=0), axis=1))
     speed = total_distance / total_time
     return speed
@@ -17,15 +17,19 @@ def get_step_length_width(L_heel_arr, R_heel_arr, LHS, RHS):
     L_step_lengths, R_step_lengths = [], []
     L_step_widths, R_step_widths = [], []
     total_step_length, total_step_width = 0, 0
-    if (LHS[0] < RHS[0]): next_foot = "right"
-    else : next_foot = "left"
+    l_next, r_next = 0, 0
+    if (LHS[0] < RHS[0]): 
+        next_foot = "right"
+        l_next += 1
+    else : 
+        next_foot = "left"
+        r_next += 1
 
-    l_next, r_next = 1, 1
     # Calculate first step length
     if(next_foot == "right"):
         c = L_heel_arr[LHS[l_next]] - L_heel_arr[LHS[l_next-1]]
-        a = R_heel_arr[RHS[r_next-1]] - L_heel_arr[LHS[r_next-1]]
-        b = L_heel_arr[LHS[l_next]] - R_heel_arr[RHS[r_next-1]]
+        a = R_heel_arr[RHS[r_next]] - L_heel_arr[LHS[l_next-1]]
+        b = L_heel_arr[LHS[l_next]] - R_heel_arr[RHS[r_next]]
 
         step_length = np.linalg.norm((np.dot(a,c)/np.linalg.norm(c)**2)*c)
         R_step_lengths.append(step_length)
@@ -39,8 +43,8 @@ def get_step_length_width(L_heel_arr, R_heel_arr, LHS, RHS):
         next_foot = "left"
     else:
         c = R_heel_arr[RHS[r_next]] - R_heel_arr[RHS[r_next-1]]
-        a = L_heel_arr[LHS[l_next-1]] - R_heel_arr[RHS[r_next-1]]
-        b = R_heel_arr[RHS[r_next]] - L_heel_arr[LHS[l_next-1]]
+        a = L_heel_arr[LHS[l_next]] - R_heel_arr[RHS[r_next-1]]
+        b = R_heel_arr[RHS[r_next]] - L_heel_arr[LHS[l_next]]
         step_length = np.linalg.norm((np.dot(a,c)/np.linalg.norm(c)**2)*c)
         L_step_lengths.append(step_length)
         total_step_length += step_length
@@ -53,7 +57,7 @@ def get_step_length_width(L_heel_arr, R_heel_arr, LHS, RHS):
         next_foot = "right"
 
     while (l_next < len(LHS) or r_next < len(RHS)):
-        if next_foot == "right":
+        if next_foot == "right": # Do right foot step
             c = np.linalg.norm(R_heel_arr[RHS[r_next]] - R_heel_arr[RHS[r_next-1]])
             a = np.linalg.norm(L_heel_arr[LHS[l_next-1]] - R_heel_arr[RHS[r_next-1]])
             b = np.linalg.norm(R_heel_arr[RHS[r_next]] - L_heel_arr[LHS[l_next-1]])
@@ -67,7 +71,7 @@ def get_step_length_width(L_heel_arr, R_heel_arr, LHS, RHS):
 
             r_next += 1
             next_foot = "left"
-        elif (next_foot == "left"):
+        elif (next_foot == "left"): # Do left foot step
             c = np.linalg.norm(L_heel_arr[LHS[l_next]] - L_heel_arr[LHS[l_next-1]])
             a = np.linalg.norm(R_heel_arr[RHS[r_next-1]] - L_heel_arr[LHS[l_next-1]])
             b = np.linalg.norm(L_heel_arr[LHS[l_next]] - R_heel_arr[RHS[r_next-1]])
@@ -141,15 +145,8 @@ def get_stride_time(LHS, RHS, frame_rate=100):
 
     return avg_stride_time, L_stride_times, R_stride_times
 
-def get_stance_time(L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs, frame_rate=100):
-    L_stance_time = 0
-    R_stance_time = 0
-    for i in range (len(L_toe_offs)):
-        L_stance_time += (L_toe_offs[i] - L_heel_strikes[i]) / frame_rate  # Convert to seconds 
-    for i in range (len(R_toe_offs)):
-        R_stance_time += (R_toe_offs[i] - R_heel_strikes[i]) / frame_rate  # Convert to seconds
-    return L_stance_time, R_stance_time
 
+# Consider how you properly assess the starting IC and ending IC of the gait cycle to calculate stance and swing times.
 def get_swing_time(L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs, frame_rate=100):
     L_swing_time = 0
     R_swing_time = 0
@@ -162,26 +159,28 @@ def get_swing_time(L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs, frame
 def compute_gait_params(trial_name, session_name):
     data = np.load(f"D:\\python_scripts\\Gait_Analysis\\data\\GaitEvents\\{session_name}\\{trial_name}_GaitEvents.npz")
     L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr = data['LHarr'], data['LTarr'], data['RHarr'], data['RTarr']
-    L_heel_vX, L_toe_vX, R_heel_vX, R_toe_vX = data['LHvX'], data['LTvX'], data['RHvX'], data['RTvX']
     L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs = data['LHS'], data['LTO'], data['RHS'], data['RTO']
     sacrum_arr = data['sacrum_arr']
     frame_rate = data['frame_rate']
     start_frame = data['start_frame']
 
     # Total time between first step and last (with 100Hz frame rate)
-    total_time = ((max(L_heel_strikes[-1], R_heel_strikes[-1]) - min(L_heel_strikes[0], R_heel_strikes[0])) + 1) / frame_rate
-    total_time_left = ((L_heel_strikes[-1] - L_heel_strikes[0]) + 1) / frame_rate
-    total_time_right = ((R_heel_strikes[-1] - R_heel_strikes[0]) + 1) / frame_rate
+    starting_IC = min(L_heel_strikes[0], R_heel_strikes[0])
+    ending_IC = max(L_heel_strikes[-1], R_heel_strikes[-1])
+    total_time = (ending_IC - starting_IC) / frame_rate
+    total_time_left = (L_heel_strikes[-1] - L_heel_strikes[0]) / frame_rate
+    total_time_right = (R_heel_strikes[-1] - R_heel_strikes[0]) / frame_rate
 
     # Compute each gait parameter
-    speed                                                   = get_speed(sacrum_arr, total_time)
+    speed                                                   = get_speed(sacrum_arr[starting_IC-1:ending_IC], total_time) # Accounting for 0-based indexing
     cadence                                                 = get_cadence(L_heel_strikes, R_heel_strikes, total_time)
-    avg_step_length, L_step_lengths, R_step_lengths, avg_step_width, L_step_widths, R_step_widths = get_step_length_width(L_heel_arr-start_frame, R_heel_arr-start_frame, L_heel_strikes, R_heel_strikes)
+    avg_step_length, L_step_lengths, R_step_lengths, avg_step_width, L_step_widths, R_step_widths = get_step_length_width(L_heel_arr, R_heel_arr, L_heel_strikes-1, R_heel_strikes-1)
     avg_step_time, L_step_times, R_step_times               = get_step_time(L_heel_strikes, R_heel_strikes, frame_rate)
-    avg_stride_length, L_stride_lengths, R_stride_lengths   = get_stride_length(L_heel_arr-start_frame, R_heel_arr-start_frame, L_heel_strikes, R_heel_strikes)
+    avg_stride_length, L_stride_lengths, R_stride_lengths   = get_stride_length(L_heel_arr, R_heel_arr, L_heel_strikes-1, R_heel_strikes-1)
     avg_stride_time, L_stride_times, R_stride_times         = get_stride_time(L_heel_strikes, R_heel_strikes, frame_rate)
-    L_stance_time, R_stance_time                            = get_stance_time(L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs, frame_rate)
+
     L_swing_time, R_swing_time                              = get_swing_time(L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs, frame_rate)
+    L_stance_time, R_stance_time                            = total_time_left - L_swing_time, total_time_right - R_swing_time
     single_support_time                                     = L_swing_time + R_swing_time
     double_support_time                                     = total_time - single_support_time
 
