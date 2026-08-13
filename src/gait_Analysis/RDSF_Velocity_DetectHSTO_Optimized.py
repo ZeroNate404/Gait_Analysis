@@ -157,16 +157,16 @@ def visualize_matplotlib(L_heel_vX, L_toe_vX, R_heel_vX, R_toe_vX, L_heel_strike
 def nexus_write_events(vicon, subject, L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs):
     for frame in L_heel_strikes: 
         print(f"Left Heel Strike frame : {frame}")
-        vicon.CreateAnEvent(subject, "Left", "Heel Strike", int(frame), 0.0)
+        vicon.CreateAnEvent(subject, "Left", "Foot Strike", int(frame), 0.0)
     for frame in R_heel_strikes:
         print(f"Right Heel Strike frame : {frame}")
-        vicon.CreateAnEvent(subject, "Right", "Heel Strike", int(frame), 0.0)
+        vicon.CreateAnEvent(subject, "Right", "Foot Strike", int(frame), 0.0)
     for frame in L_toe_offs: 
         print(f"Left Toe Off frame : {frame}")
-        vicon.CreateAnEvent(subject, "Left", "Toe Off", int(frame), 0.0)
+        vicon.CreateAnEvent(subject, "Left", "Foot Off", int(frame), 0.0)
     for frame in R_toe_offs:
         print(f"Right Toe Off frame : {frame}")
-        vicon.CreateAnEvent(subject, "Right", "Toe Off", int(frame), 0.0)
+        vicon.CreateAnEvent(subject, "Right", "Foot Off", int(frame), 0.0)
     print(f"Successfully created {len(L_heel_strikes)} Left Heel Strikes and {len(R_heel_strikes)} Right Heel Strikes.")
     print(f"Successfully created {len(L_toe_offs)} Left Toe Offs and {len(R_toe_offs)} Right Toe Offs.")
 
@@ -252,7 +252,7 @@ def main():
     save_events_npz(trial_name, session_name, gait_events)
 
     # 9. Compute Gait Parameters (Optional)
-    gp.compute_gait_params(trial_name, session_name)
+    # gp.compute_gait_params(trial_name, session_name)
 
 
 main()

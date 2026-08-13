@@ -146,6 +146,7 @@ def compute_gait_params(trial_name, session_name):
     sacrum_arr = data['sacrum_arr']
     frame_rate = data['frame_rate']
     start_frame = data['start_frame']
+    data.close()  # Close the file after loading the data
 
     # Total time between first step and last (with 100Hz frame rate)
     starting_IC = min(L_heel_strikes[0], R_heel_strikes[0])
