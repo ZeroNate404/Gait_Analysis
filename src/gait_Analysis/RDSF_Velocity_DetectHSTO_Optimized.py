@@ -182,7 +182,8 @@ def main():
     frame_rate = vicon.GetFrameRate()
     # Command-line arguments (INPUT)
     # subject = sys.argv[1] if len(sys.argv) > 1 else vicon.GetSubjectNames()[0]
-    subject = vicon.GetSubjectNames()[0]  # Default to the first subject detected in the session
+    # subject = vicon.GetSubjectNames()[0]  # Default to the first subject detected in the session
+    subject = "Oli_2"
     start_frame = int(sys.argv[2]) if len(sys.argv) > 2 else 1
     end_frame = int(sys.argv[3]) if len(sys.argv) > 3 else vicon.GetFrameCount()
 

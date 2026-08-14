@@ -21,12 +21,12 @@ for each HEEL STRIKE and TOE OFF detected for both left and right foot.
 
 # 1. Connect to active Vicon Nexus session
 vicon = ViconNexus.ViconNexus()
-subject = "Oli 2"
+subject = "Oli_2"
 # subject = sys.argv[1] if len(sys.argv) > 1 else vicon.GetSubjectNames()[0]
 
 # 2. Get Marker Trajectories
-L_heel_X, L_heel_Y, _, exist = vicon.GetTrajectory(subject, "LHEE")
-L_toe_X, L_toe_Y, _, _  = vicon.GetTrajectory(subject, "LTOE")
+L_heel_X, L_heel_Y, _, _ = vicon.GetTrajectory(subject, "LHEE")
+L_toe_X, L_toe_Y, _, exist  = vicon.GetTrajectory(subject, "LTOE")
 R_heel_X, R_heel_Y, _, _ = vicon.GetTrajectory(subject, "RHEE")
 R_toe_X, R_toe_Y, _, _  = vicon.GetTrajectory(subject, "RTOE")
 L_PSI_X, L_PSI_Y, _, _ = vicon.GetTrajectory(subject, "LPSI")
@@ -38,16 +38,15 @@ R_heel_arr = np.column_stack((R_heel_X, R_heel_Y))
 R_toe_arr  = np.column_stack((R_toe_X, R_toe_Y))
 L_PSI_arr = np.column_stack((L_PSI_X, L_PSI_Y))
 R_PSI_arr = np.column_stack((R_PSI_X, R_PSI_Y))
-
 # Cut the motiont tracking to a specific range of frames
 start_frame = int(sys.argv[2]) if len(sys.argv) > 2 else 1
 end_frame = int(sys.argv[3]) if len(sys.argv) > 3 else len(L_heel_arr)
-L_heel_arr = L_heel_arr[start_frame-1:end_frame-1] # to align with 0-indexing
-L_toe_arr  = L_toe_arr[start_frame-1:end_frame-1]
-R_heel_arr = R_heel_arr[start_frame-1:end_frame-1]
-R_toe_arr  = R_toe_arr[start_frame-1:end_frame-1]
-L_PSI_arr = L_PSI_arr[start_frame-1:end_frame-1]
-R_PSI_arr = R_PSI_arr[start_frame-1:end_frame-1]
+L_heel_arr = L_heel_arr[start_frame-1:end_frame] # to align with 0-indexing
+L_toe_arr  = L_toe_arr[start_frame-1:end_frame]
+R_heel_arr = R_heel_arr[start_frame-1:end_frame]
+R_toe_arr  = R_toe_arr[start_frame-1:end_frame]
+L_PSI_arr = L_PSI_arr[start_frame-1:end_frame]
+R_PSI_arr = R_PSI_arr[start_frame-1:end_frame]
 
 # Calculate Sacrum as the midpoint: S = (LPSI + RPSI) / 2
 sacrum_arr = (L_PSI_arr + R_PSI_arr) / 2.0
@@ -90,10 +89,10 @@ L_toe_mean = np.mean(L_toe_filt)
 R_toe_mean = np.mean(R_toe_filt)
 # Adjust 'distance' based on min frames between steps (e.g., 0.5 sec * frame_rate)
 min_dist = int(0.5 * frame_rate)
-L_heel_strikes, _ = find_peaks(L_heel_filt, distance=min_dist, height=L_heel_mean)
-R_heel_strikes, _ = find_peaks(R_heel_filt, distance=min_dist, height=R_heel_mean)
-L_toe_offs, _     = find_peaks(-L_toe_filt, distance=min_dist, height=L_toe_mean)
-R_toe_offs, _     = find_peaks(-R_toe_filt, distance=min_dist, height=R_toe_mean)
+L_heel_strikes, _ = find_peaks(L_heel_filt, height=L_heel_mean)
+R_heel_strikes, _ = find_peaks(R_heel_filt, height=R_heel_mean)
+L_toe_offs, _     = find_peaks(-L_toe_filt, height=-L_toe_mean)
+R_toe_offs, _     = find_peaks(-R_toe_filt, height=-R_toe_mean)
 
 # Adjust for 0-based indexing and the start frame offset
 L_heel_strikes += start_frame  
@@ -113,33 +112,35 @@ plt.xlim(left=start_frame,right=end_frame)
 plt.show()
 
 # 6. Write events back into Vicon Nexus session
-with open("D:\\python scripts\\GaitEvents.txt", "a") as file:
-    file.write(f"Test run time {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-    for frame in L_heel_strikes:
-        file.write(f"Left Heel Strike frame : {frame}  | distance : {L_heel_filt[frame-start_frame]}\n")
-        print("==============================================")
-        print(f"distance before:")
-        for i in range(3): print(f"{(-3+i)}: {L_heel_filt[frame-start_frame + (-3+i)]}")
-        print(f"Left Heel Strike frame : {frame}  | distance : {L_heel_filt[frame-start_frame]}")
-        print(f"distance after :")
-        for i in range(3): print(f"{(1+i)}: {L_heel_filt[frame-start_frame + (1+i)]}")- 
-        vicon.CreateAnEvent(subject, "Left", "Heel Strike", int(frame), 0.0)
-        print()
-    # for frame in R_heel_strikes:
-    #     print(f"Right Heel Strike frame : {frame}")
-    #     vicon.CreateAnEvent(subject, "Right", "Heel Strike", int(frame), 0.0)
-    for frame in L_toe_offs:
-        file.write(f"Left Toe Off frame : {frame}  | distance : {L_toe_filt[frame-start_frame]}\n")
-        print("==============================================")
-        print(f"distance before:")
-        for i in range(3): print(f"{(-3+i)}: {L_toe_filt[frame-start_frame + (-3+i)]}")
-        print(f"Left Toe Off frame : {frame}  | distance : {L_toe_filt[frame-start_frame]}")
-        print(f"distance after :")
-        for i in range(3): print(f"{(1+i)}: {L_toe_filt[frame-start_frame + (1+i)]}")
-        vicon.CreateAnEvent(subject, "Left", "Toe Off", int(frame), 0.0)
-        print()
-    # for frame in R_toe_offs:
-    #     print(f"Right Toe Off frame : {frame}")
-    #     vicon.CreateAnEvent(subject, "Right", "Toe Off", int(frame), 0.0)
+# with open("D:\\python scripts\\GaitEvents.txt", "a") as file:
+# file.write(f"Test run time {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+for frame in L_heel_strikes:
+    # file.write(f"Left Heel Strike frame : {frame}  | distance : {L_heel_filt[frame-start_frame]}\n")
+    # print("==============================================")
+    # print(f"distance before:")
+    # for i in range(3): print(f"{(-3+i)}: {L_heel_filt[frame-start_frame + (-3+i)]}")
+    # print(f"Left Heel Strike frame : {frame}  | distance : {L_heel_filt[frame-start_frame]}")
+    # print(f"distance after :")
+    # for i in range(3): print(f"{(1+i)}: {L_heel_filt[frame-start_frame + (1+i)]}")
+    vicon.CreateAnEvent(subject, "General", "Heel Strike", int(frame), 0.0)
+    print(f"Left Heel Strike frame : {frame}")
+    # print()
+# for frame in R_heel_strikes:
+#     print(f"Right Heel Strike frame : {frame}")
+#     vicon.CreateAnEvent(subject, "Right", "Heel Strike", int(frame), 0.0)
+for frame in L_toe_offs:
+    # file.write(f"Left Toe Off frame : {frame}  | distance : {L_toe_filt[frame-start_frame]}\n")
+    # print("==============================================")
+    # print(f"distance before:")
+    # for i in range(3): print(f"{(-3+i)}: {L_toe_filt[frame-start_frame + (-3+i)]}")
+    # print(f"Left Toe Off frame : {frame}  | distance : {L_toe_filt[frame-start_frame]}")
+    # print(f"distance after :")
+    # for i in range(3): print(f"{(1+i)}: {L_toe_filt[frame-start_frame + (1+i)]}")
+    vicon.CreateAnEvent(subject, "General", "Toe Off", int(frame), 0.0)
+    print(f"Left Toe Off frame : {frame}")
+    # print()
+# for frame in R_toe_offs:
+#     print(f"Right Toe Off frame : {frame}")
+#     vicon.CreateAnEvent(subject, "Right", "Toe Off", int(frame), 0.0)
 print(f"Successfully created {len(L_heel_strikes)} Left Heel Strikes and {len(R_heel_strikes)} Right Heel Strikes.")
 print(f"Successfully created {len(L_toe_offs)} Left Toe Offs and {len(R_toe_offs)} Right Toe Offs.")
