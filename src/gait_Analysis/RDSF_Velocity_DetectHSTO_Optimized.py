@@ -1,4 +1,5 @@
-import sys, datetime, os
+import sys, datetime, os, yaml
+import ezc3d
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
@@ -21,7 +22,7 @@ and prints the frame number
 for each HEEL STRIKE and TOE OFF detected for both left and right foot.
 '''
 
-def get_heel_toe_arr(vicon, subject):
+def get_vicon_heel_toe_arr(vicon, subject):
     # 2. Get Marker Trajectories
     L_heel_X, L_heel_Y, _, exist = vicon.GetTrajectory(subject, "LHEE")
     L_toe_X, L_toe_Y, _, _  = vicon.GetTrajectory(subject, "LTOE")
@@ -176,19 +177,43 @@ def save_events_npz(trial_name, session_name, gait_events):
     save_path = os.path.join(save_dir, f"{trial_name}_GaitEvents.npz")
     np.savez(save_path, **gait_events)
 
-def main():
+def main(config):
     # 1. Connect to active Vicon Nexus session
     vicon = ViconNexus.ViconNexus()
     frame_rate = vicon.GetFrameRate()
     # Command-line arguments (INPUT)
-    # subject = sys.argv[1] if len(sys.argv) > 1 else vicon.GetSubjectNames()[0]
-    # subject = vicon.GetSubjectNames()[0]  # Default to the first subject detected in the session
-    subject = "Oli_2"
-    start_frame = int(sys.argv[2]) if len(sys.argv) > 2 else 1
-    end_frame = int(sys.argv[3]) if len(sys.argv) > 3 else vicon.GetFrameCount()
+    input_config = config.get("input", {})
+    input_type = input_config.get("type", "vicon")
+    input_dir = input_config.get("directory", "")
+    input_trial = config.get("trial",{})
+    start_frame = input_trial.get("start_frame")
+    end_frame = input_trial.get("end_frame")
 
     # 2. Get Marker Trajectories
-    L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr, sacrum_arr = get_heel_toe_arr(vicon, subject)
+    if(input_type == "vicon"):
+        L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr, sacrum_arr = get_vicon_heel_toe_arr(vicon, subject="Oli_2")
+    elif(input_type == "bmclab"):
+        # Load C3D
+        c3d = ezc3d.c3d(input_dir)
+        # Marker trajectories
+        frame_rate = c3d["header"]["points"]["frame_rate"]
+        units = c3d["parameters"]["POINT"]["UNITS"]["value"][0]
+        points = c3d["data"]["points"]
+        labels = c3d["parameters"]["POINT"]["LABELS"]["value"]
+        marker_dict = {label: i for i, label in enumerate(labels)}
+
+        L_heel_arr = points[:3,marker_dict["L.Heel"],start_frame-1:end_frame] # 1 --> 0 Indexing
+        L_toe_arr = points[:3,marker_dict["L.MT2"],start_frame-1:end_frame]
+        R_heel_arr = points[:3,marker_dict["R.Heel"],start_frame-1:end_frame]
+        R_toe_arr = points[:3,marker_dict["R.MT2"],start_frame-1:end_frame]
+        RPSI = points[:3,marker_dict["R.PSIS"],start_frame-1:end_frame]
+        LPSI = points[:3,marker_dict["L.PSIS"],start_frame-1:end_frame]
+        sacrum_arr = (RPSI+LPSI)/2
+        
+    elif(input_type == "carepd"):
+
+    
+    
 
     # 3. Compute Walking Direction 
     sacrum_arr_cropped = sacrum_arr[start_frame-1:end_frame] # Align 1-indexing to 0-indexing. Note numpy slicing is [start,end)
@@ -256,4 +281,7 @@ def main():
     # gp.compute_gait_params(trial_name, session_name)
 
 
-main()
+
+with open("config/input_config.yaml", "r") as f:
+    config = yaml.safe_load(f)
+main(config)

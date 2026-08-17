@@ -1,0 +1,18 @@
+# config.yaml
+
+input:
+  type: "vicon"
+  directory: "D:/GaitData/Subject01/Session01"
+
+trial:
+  start_frame: 100
+  end_frame: 1250
+
+output:
+  directory: "D:/GaitData/Subject01/Results"
+
+gait_events:
+  detect: true
+
+gait_parameters:
+  compute: true

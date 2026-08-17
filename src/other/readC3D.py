@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 # Load C3D
-c3d = ezc3d.c3d(r"data\BMCLab\SUB11_off_walk_13.c3d")
+c3d = ezc3d.c3d(r"data\BMCLab\SUB05_off_walk_1.c3d")
 
 # Marker trajectories
 frame_rate = c3d["header"]["points"]["frame_rate"]
