@@ -1,18 +1,11 @@
 # config.yaml
 
 input:
-  type: "vicon"
-  directory: "D:/GaitData/Subject01/Session01"
+  type: "bmclab"
+  directory: "data\BMCLab\SUB05_off_walk_1.c3d"
 
 trial:
+  session: "20260803"
+  name: "SUB05_off_walk_1"
   start_frame: 100
   end_frame: 1250
-
-output:
-  directory: "D:/GaitData/Subject01/Results"
-
-gait_events:
-  detect: true
-
-gait_parameters:
-  compute: true
