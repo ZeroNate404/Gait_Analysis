@@ -3,9 +3,7 @@ import ezc3d
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
-import gaitParam_optimized as gp
-from scipy.signal import butter, filtfilt
-from viconnexusapi import ViconNexus
+
 
 '''
 ===================INPUT===================================
@@ -21,6 +19,23 @@ Writes an EVENT onto the vicon Nexus session timeline
 and prints the frame number
 for each HEEL STRIKE and TOE OFF detected for both left and right foot.
 '''
+error_msgs = []
+
+def generalize(LHEE,LTOE,RHEE,RTO,SACR):
+    # GENERALIZE DATA
+    # Generalize measurement units
+    if (units != "mm"):
+        error_msgs.append("UNALIGNED MEASUREMENT UNITS")
+
+    # Generalize coordinate system
+
+
+    # Generalize frame rate
+
+    # Raise if ERROR exist
+    if error_msgs:
+        raise InvalidConfigError(error_msgs)
+
 
 def get_vicon_heel_toe_arr(vicon, subject):
     # 2. Get Marker Trajectories
@@ -171,52 +186,99 @@ def nexus_write_events(vicon, subject, L_heel_strikes, L_toe_offs, R_heel_strike
     print(f"Successfully created {len(L_heel_strikes)} Left Heel Strikes and {len(R_heel_strikes)} Right Heel Strikes.")
     print(f"Successfully created {len(L_toe_offs)} Left Toe Offs and {len(R_toe_offs)} Right Toe Offs.")
 
-def save_events_npz(trial_name, session_name, gait_events):
-    save_dir = rf"D:\python_scripts\Gait_Analysis\data\GaitEvents\{session_name}"
+def save_events_npz(input_type, trial_name, session_name, gait_events):
+    save_dir = rf"data\GaitEvents\{input_type}"
+    if(input_type == "vicon"):
+        save_dir = os.path.join(save_dir, session_name)
     os.makedirs(save_dir, exist_ok=True)
     save_path = os.path.join(save_dir, f"{trial_name}_GaitEvents.npz")
     np.savez(save_path, **gait_events)
 
 def main(config):
-    # 1. Connect to active Vicon Nexus session
-    vicon = ViconNexus.ViconNexus()
-    frame_rate = vicon.GetFrameRate()
-    # Command-line arguments (INPUT)
-    input_config = config.get("input", {})
-    input_type = input_config.get("type", "vicon")
-    input_dir = input_config.get("directory", "")
-    input_trial = config.get("trial",{})
-    start_frame = input_trial.get("start_frame")
-    end_frame = input_trial.get("end_frame")
+    # 1. Command-line arguments (INPUT)
+    input_type = config["input"]["type"].lower()
+    input_dir = config["input"]["directory"]
+    start_frame = config["trial"]["start_frame"]
+    end_frame = config["trial"]["end_frame"]
+    trial_name = config["trial"]["name"]
+    session_name = config["trial"]["session"]
+    frame_rate = 150
+    if not input_type or not input_dir:
+        raise InvalidConfigError("Input type and directory must be specified in the configuration.")
+    if not start_frame or not end_frame:
+        raise InvalidConfigError("Start frame and end frame must be specified in the configuration.")
+    if not frame_rate:
+        raise InvalidConfigError("Frame rate must be specified in the configuration.")
+    
 
     # 2. Get Marker Trajectories
     if(input_type == "vicon"):
+        from scipy.signal import butter, filtfilt
+        from viconnexusapi import ViconNexus
+        # Connect to active Vicon Nexus session
+        vicon = ViconNexus.ViconNexus()
+        frame_rate = vicon.GetFrameRate()
+        subject = vicon.getSubjectNames()[0]
+        trial_path, trial_name = vicon.GetTrialName()
+        session_name = os.path.basename(os.path.normpath(trial_path))
+        if(len(sys.argv)>1): start_frame = sys.argv[1]
+        if(len(sys.argv)>2): end_frame = sys.argv[2]
         L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr, sacrum_arr = get_vicon_heel_toe_arr(vicon, subject="Oli_2")
+        units = "mm"
+
     elif(input_type == "bmclab"):
         # Load C3D
-        c3d = ezc3d.c3d(input_dir)
+        c3d_file = ezc3d.c3d(input_dir)
         # Marker trajectories
-        frame_rate = c3d["header"]["points"]["frame_rate"]
-        units = c3d["parameters"]["POINT"]["UNITS"]["value"][0]
-        points = c3d["data"]["points"]
-        labels = c3d["parameters"]["POINT"]["LABELS"]["value"]
-        marker_dict = {label: i for i, label in enumerate(labels)}
+        frame_rate = c3d_file["header"]["points"]["frame_rate"]
+        units = c3d_file["parameters"]["POINT"]["UNITS"]["value"][0]
+        points = c3d_file["data"]["points"]
+        labels = c3d_file["parameters"]["POINT"]["LABELS"]["value"]
+        marker_dict = {label:i for i,label in enumerate(labels)}
 
-        L_heel_arr = points[:3,marker_dict["L.Heel"],start_frame-1:end_frame] # 1 --> 0 Indexing
-        L_toe_arr = points[:3,marker_dict["L.MT2"],start_frame-1:end_frame]
-        R_heel_arr = points[:3,marker_dict["R.Heel"],start_frame-1:end_frame]
-        R_toe_arr = points[:3,marker_dict["R.MT2"],start_frame-1:end_frame]
-        RPSI = points[:3,marker_dict["R.PSIS"],start_frame-1:end_frame]
-        LPSI = points[:3,marker_dict["L.PSIS"],start_frame-1:end_frame]
+        L_heel_arr = np.array(points[:3,marker_dict["L.Heel"],start_frame-1:end_frame]) # 1 --> 0 Indexing
+        L_toe_arr = np.array(points[:3,marker_dict["L.MT2"],start_frame-1:end_frame])
+        R_heel_arr = np.array(points[:3,marker_dict["R.Heel"],start_frame-1:end_frame])
+        R_toe_arr = np.array(points[:3,marker_dict["R.MT2"],start_frame-1:end_frame])
+        RPSI = np.array(points[:3,marker_dict["R.PSIS"],start_frame-1:end_frame])
+        LPSI = np.array(points[:3,marker_dict["L.PSIS"],start_frame-1:end_frame])
         sacrum_arr = (RPSI+LPSI)/2
-        
-    elif(input_type == "carepd"):
 
-    
-    
+    elif(input_type == "carepd"):
+        # Load NPZ
+        data = np.load(input_dir, allow_pickle=True)
+        # Marker Trajectories
+        points = data["positions"]
+        labels = data["joint_names"]
+        marker_dict = {label:i for i,label in enumerate(labels)}
+        L_heel_X, L_heel_Y = points[:,marker_dict["left_heel"],0], points[:,marker_dict["left_heel"],1]
+        L_toe_X, L_toe_Y = points[:,marker_dict["left_big_toe"],0], points[:,marker_dict["left_big_toe"],1]
+        R_heel_X, R_heel_Y = points[:,marker_dict["right_heel"],0], points[:,marker_dict["right_heel"],1]
+        R_toe_X, R_toe_Y = points[:,marker_dict["right_big_toe"],0], points[:,marker_dict["right_big_toe"],1]
+        L_PSI_X, L_PSI_Y = points[:,marker_dict["left_hip"],0], points[:,marker_dict["left_hip"],1]
+        R_PSI_X, R_PSI_Y = points[:,marker_dict["right_hip"],0], points[:,marker_dict["right_hip"],1]
+        # Stack 1D X and Y arrays into a 2D (N, 2) array
+        L_heel_arr = np.column_stack((L_heel_X, L_heel_Y))
+        L_toe_arr  = np.column_stack((L_toe_X, L_toe_Y))
+        R_heel_arr = np.column_stack((R_heel_X, R_heel_Y))
+        R_toe_arr  = np.column_stack((R_toe_X, R_toe_Y))
+        L_PSI_arr = np.column_stack((L_PSI_X, L_PSI_Y))
+        R_PSI_arr = np.column_stack((R_PSI_X, R_PSI_Y))
+        sacrum_arr = (L_PSI_arr + R_PSI_arr) / 2
+
+    else:
+        error_msgs.append("Input Type not Specified")
+    # Make sure data is generalized
+    '''
+    Measurement unit        : mm
+    World XYZ               : X(front) | Y(right) | Z(up)
+    Frame_rate              : 100 Hz
+    Time alignment          : First Heel Strike
+    '''
+    # L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr, sacrum_arr = generalize(L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr, sacrum_arr)
 
     # 3. Compute Walking Direction 
-    sacrum_arr_cropped = sacrum_arr[start_frame-1:end_frame] # Align 1-indexing to 0-indexing. Note numpy slicing is [start,end)
+    sacrum_arr_cropped = sacrum_arr[start_frame-1:end_frame] # 1 -> 0 Indexing
     R, walk_dir = compute_walk_dir(sacrum_arr_cropped, frame_rate)
 
     # 4. Transform Coordinates to align with walking direction
@@ -242,17 +304,12 @@ def main(config):
                          R_toe_vX[start_frame-1:end_frame],
                          L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs, start_frame, end_frame)
     # 8. Write Events to Vicon Nexus
-    nexus_write_events(vicon, subject, L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs)
+    if(input_type == "vicon"):
+        nexus_write_events(vicon, subject, L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs)
 
     # 9. Save Events to NPZ file
-    trial_path, trial_name = vicon.GetTrialName()
-    session_name = os.path.basename(os.path.normpath(trial_path))
-    subject_name = vicon.GetSubjectNames()[0]
     gait_events = {
         "Date" : datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S"),
-        "Run_name" : trial_name,
-        "Session_name" : session_name,
-        "Subject_name" : subject_name,
         "frame_rate": frame_rate,
         "start_frame": start_frame,
         "end_frame": end_frame,
@@ -275,13 +332,25 @@ def main(config):
         "LTO": L_toe_offs,
         "RTO": R_toe_offs,
     }
-    save_events_npz(trial_name, session_name, gait_events)
+    if(input_type == "vicon"):
+        gait_events["Run_name"] = trial_name
+        gait_events["Session_name"] = session_name
+        gait_events["Subject_name"] = subject
+
+    save_events_npz(input_type, trial_name, session_name, gait_events)
 
     # 9. Compute Gait Parameters (Optional)
     # gp.compute_gait_params(trial_name, session_name)
 
+class InvalidConfigError(Exception):
+    def __init__(self, error_msgs):
+        self.error_msgs = error_msgs
+        super().__init__("\n".join(error_msgs))
 
-
-with open("config/input_config.yaml", "r") as f:
+with open("src/gait_analysis/config/input_config.yaml", "r") as f:
     config = yaml.safe_load(f)
-main(config)
+try:
+    main(config)
+except InvalidConfigError as e:
+    for msg in e.error_msgs:
+        print(msg)

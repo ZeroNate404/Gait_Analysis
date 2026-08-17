@@ -1,7 +1,7 @@
-import os
-from matplotlib.pyplot import step
+import os, yaml
 import numpy as np
-
+import matplotlib.pyplot as plt
+from Visualize_Param import plot_gait_summary, plot_gait_cycle_phases
 
 def get_speed(sacrum_arr, total_time):
     # Calculate the total cumulative sacrum displacements as path length
@@ -128,7 +128,6 @@ def get_stride_time(LHS, RHS, frame_rate=100):
 
     return avg_stride_time, L_stride_times, R_stride_times
 
-
 # Consider how you properly assess the starting IC and ending IC of the gait cycle to calculate stance and swing times.
 def get_swing_time(L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs, frame_rate=100):
     L_swing_time = 0
@@ -139,8 +138,22 @@ def get_swing_time(L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs, frame
         R_swing_time += (R_heel_strikes[i] - R_toe_offs[i-1]) / frame_rate  # Convert to seconds
     return L_swing_time, R_swing_time
 
-def compute_gait_params(trial_name, session_name):
-    data = np.load(f"D:\\python_scripts\\Gait_Analysis\\data\\GaitEvents\\{session_name}\\{trial_name}_GaitEvents.npz")
+def compute_gait_params(config):
+    # Get INPUT
+    error_msgs = []
+    session_name = config["trial"]["session"]
+    trial_name = config["trial"]["name"]
+    input_type = config["input"]["type"]
+    if not session_name : error_msgs.append("!! Missing trial session !!")
+    if not trial_name : error_msgs.append("!! Missing trial name !!")
+    if not input_type : error_msgs.append("!! Missing input type !!")
+    if(error_msgs): raise InvalidConfigError
+
+    # Extract GaitEvents file
+    if(input_type == "vicon"):
+        data = np.load(f"data\\GaitEvents\\{input_type}\\{session_name}\\{trial_name}_GaitEvents.npz")
+    else:
+        data = np.load(f"data\\GaitEvents\\{input_type}\\{trial_name}_GaitEvents.npz")
     L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr = data['LHarr'], data['LTarr'], data['RHarr'], data['RTarr']
     L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs = data['LHS'], data['LTO'], data['RHS'], data['RTO']
     sacrum_arr = data['sacrum_arr']
@@ -314,7 +327,26 @@ def compute_gait_params(trial_name, session_name):
             "%" : (double_support_time / total_time) * 100
         }
     }
-    save_dir = rf"D:\python_scripts\Gait_Analysis\data\GaitParams\{session_name}"
+    if(input_type == "vicon"):
+        save_dir = rf"data\GaitParams\{input_type}\{session_name}"
+    else:
+        save_dir = rf"data\GaitParams\{input_type}"
     os.makedirs(save_dir, exist_ok=True)
     save_path = os.path.join(save_dir, f"{trial_name}_GaitParams.npz")
     np.savez(save_path, **gait_params)
+
+    plot_gait_summary(config)
+    plot_gait_cycle_phases(config)
+
+class InvalidConfigError(Exception):
+    def __init__(self, error_msgs):
+        self.error_msgs = error_msgs
+        super().__init__("\n".join(error_msgs))
+
+with open("src/gait_analysis/config/input_config.yaml", "r") as f:
+    config = yaml.safe_load(f)
+try:
+    compute_gait_params(config)
+except InvalidConfigError as e:
+    for msg in e.error_msgs:
+        print(msg)

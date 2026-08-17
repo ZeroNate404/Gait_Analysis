@@ -10,9 +10,10 @@ def main():
     frame_rate = vicon.GetFrameRate()
     subject = vicon.GetSubjectNames()[0]  # Default to the first subject detected in the session
     trial_path, trial_name = vicon.GetTrialName()
+    input_type = "Vicon"
     session_name = os.path.basename(os.path.normpath(trial_path))
  
-    file_path = f"D:\\python_scripts\\Gait_Analysis\\data\\GaitEvents\\{session_name}\\{trial_name}_GaitEvents.npz"
+    file_path = f"D:\\python_scripts\\Gait_Analysis\\data\\GaitEvents\\{input_type}\\{session_name}\\{trial_name}_GaitEvents.npz"
     # 2. Load existing file into a plain dict, then close it
     npz_file = np.load(file_path, allow_pickle=True)
     data = {key: npz_file[key] for key in npz_file.files}
@@ -26,10 +27,9 @@ def main():
     data['LTO'] = np.array(LTO[0],dtype=int)
     data['RHS'] = np.array(RHS[0],dtype=int)
     data['RTO'] = np.array(RTO[0],dtype=int)
-
     np.savez(file_path, **data)
 
-    gp.compute_gait_params(trial_name, session_name)  # Compute gait parameters after updating events
+    # gp.compute_gait_params(trial_name, session_name)  # Compute gait parameters after updating events
 
 
 main()
