@@ -2,7 +2,7 @@ import os, yaml
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-from utils.find_project_root import find_project_root
+from gait_Analysis.utils.find_project_root import find_project_root
 
 
 def _load_gait_params(session, trial_name, input_type):

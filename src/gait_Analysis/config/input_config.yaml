@@ -1,11 +1,11 @@
 # config.yaml
 
 input:
-  type: "carepd"
-  directory: "data\\CarePD\\BMCLab_SUB05_off_walk_1_canonical_keypoints_mm.npz"
+  type: "vicon"
+  directory: "data\\GaitParams\vicon\\20260803\\20260803_sub05_walk01_run1_GaitParams.npz"
 
 trial:
-  session: "20260818"
-  name: "BMCLab_SUB05_off_walk_1_canonical_keypoints_mm"
-  start_frame: 100
-  end_frame: 1250
+  session: "20260803"
+  name: "20260803_sub05_walk01_run1"
+  start_frame:
+  end_frame:

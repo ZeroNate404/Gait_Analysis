@@ -1,9 +1,10 @@
-import os, yaml
+import os, yaml, sys, csv
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-from Visualize_Param import plot_gait_summary, plot_gait_cycle_phases
-from utils.find_project_root import find_project_root
+from itertools import zip_longest
+from gait_Analysis.Visualize_Param import plot_gait_summary, plot_gait_cycle_phases
+from gait_Analysis.utils.find_project_root import find_project_root
 
 def get_speed(sacrum_arr, total_time):
     # Calculate the total cumulative sacrum displacements as path length
@@ -163,7 +164,6 @@ def compute_gait_params(config):
     L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs = data['LHS'], data['LTO'], data['RHS'], data['RTO']
     sacrum_arr = data['sacrum_arr']
     frame_rate = data['frame_rate']
-    start_frame = data['start_frame']
     data.close()  # Close the file after loading the data
 
     # Total time between first step and last (with 100Hz frame rate)
@@ -332,12 +332,37 @@ def compute_gait_params(config):
             "%" : (double_support_time / total_time) * 100
         }
     }
-    # Save the Computed Gait Parameters
+    # Save the Computed Gait Parameters to NPZ
     SAVE_DIR = PROJECT_ROOT / "data" / "GaitParams" / input_type
     if input_type == "vicon": SAVE_DIR = SAVE_DIR / session_name
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
     SAVE_PATH = SAVE_DIR / f"{trial_name}_GaitParams.npz"
     np.savez(SAVE_PATH, **gait_params)
+
+    # Save the Computed Gait Parameters to CSV
+    columns = {
+        "speed": [speed],
+        "cadence": [cadence],
+
+        "step_width_left": L_step_widths,
+        "step_width_right": R_step_widths,
+        "step_width_average": [avg_step_width],
+
+        "step_length_left": L_step_lengths,
+        "step_length_right": R_step_lengths,
+        "step_length_average": [avg_step_length],
+
+        "step_time_left": L_step_times,
+        "step_time_right": R_step_times,
+        "step_time_average": [avg_step_time],
+    }
+
+    SAVE_PATH = SAVE_DIR / f"{trial_name}_GaitParams.csv"
+    with open(SAVE_PATH, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(columns.keys())
+        for row in zip_longest(*columns.values(), fillvalue=""):
+            writer.writerow(row)
 
     # Visualize the acquired gait parameters
     plot_gait_summary(config)
@@ -348,7 +373,7 @@ class InvalidConfigError(Exception):
         self.error_msgs = error_msgs
         super().__init__("\n".join(error_msgs))
 
-with open("src/gait_analysis/config/input_config.yaml", "r") as f:
+with open("src/gait_Analysis/config/input_config.yaml", "r") as f:
     config = yaml.safe_load(f)
 try:
     compute_gait_params(config)

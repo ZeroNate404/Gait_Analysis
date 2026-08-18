@@ -2,7 +2,7 @@ import os
 import numpy as np
 import gaitParam_optimized as gp
 from viconnexusapi import ViconNexus
-from utils.find_project_root import find_project_root
+from gait_Analysis.utils.find_project_root import find_project_root
 
 
 def main():

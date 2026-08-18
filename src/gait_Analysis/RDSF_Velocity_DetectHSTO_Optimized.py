@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import warnings
 from scipy.signal import butter, filtfilt
 from pathlib import Path
-from src.utils.find_project_root import find_project_root
+from gait_Analysis.utils.find_project_root import find_project_root
 
 '''
 ===================INPUT===================================
@@ -57,9 +57,7 @@ def generalize(metadata, LHEE, LTOE, RHEE, RTOE, SACR):
     '''Not yet written'''
 
     # Return XY trajectories
-    return LHEE, LTOE, RHEE, RTOE, SACR
-
-
+    return LHEE[:, :2], LTOE[:, :2], RHEE[:, :2], RTOE[:, :2], SACR[:, :2] # Take only XY
 
 def get_vicon_heel_toe_arr(vicon, subject):
     # 2. Get Marker Trajectories
@@ -111,45 +109,45 @@ def compute_walk_dir(sacrum_arr, frame_rate):
 
     return R, walk_dir
 
-def align_with_walkdir(L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr, sacrum_arr, R):
+def align_with_walkdir(LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr, sacrum_arr, R):
     # Set Sacrum as Origin
-    L_heel_arr -= sacrum_arr
-    L_toe_arr -= sacrum_arr
-    R_heel_arr -= sacrum_arr
-    R_toe_arr -= sacrum_arr
+    LHEE_arr -= sacrum_arr
+    LTOE_arr -= sacrum_arr
+    RHEE_arr -= sacrum_arr
+    RTOE_arr -= sacrum_arr
 
     # Rotate coordinates by R to align with the walking direction
-    L_heel_arr = L_heel_arr @ R.T
-    L_toe_arr  = L_toe_arr @ R.T
-    R_heel_arr = R_heel_arr @ R.T
-    R_toe_arr  = R_toe_arr @ R.T
+    LHEE_arr = LHEE_arr @ R.T
+    LTOE_arr  = LTOE_arr @ R.T
+    RHEE_arr = RHEE_arr @ R.T
+    RTOE_arr  = RTOE_arr @ R.T
 
-    return L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr
+    return LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr
 
-def compute_projected_velocity(L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr, frame_rate):
+def compute_projected_velocity(LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr, frame_rate):
     # Obtain velocity vectors (mm/s)
     dt = 1.0 / frame_rate
-    L_heel_vel = np.gradient(L_heel_arr, dt, axis=0)
-    L_toe_vel = np.gradient(L_toe_arr, dt, axis=0)
-    R_heel_vel = np.gradient(R_heel_arr, dt, axis=0)
-    R_toe_vel = np.gradient(R_toe_arr, dt, axis=0)
+    L_heel_vel = np.gradient(LHEE_arr, dt, axis=0)
+    L_toe_vel = np.gradient(LTOE_arr, dt, axis=0)
+    R_heel_vel = np.gradient(RHEE_arr, dt, axis=0)
+    R_toe_vel = np.gradient(RTOE_arr, dt, axis=0)
 
     # Track vX (velocity in the walking direction) for each marker
-    L_heel_vX = L_heel_vel[:, 0]
-    L_toe_vX = L_toe_vel[:, 0]
-    R_heel_vX = R_heel_vel[:, 0]
-    R_toe_vX = R_toe_vel[:, 0]
+    LHEE_vX = L_heel_vel[:, 0]
+    LTOE_vX = L_toe_vel[:, 0]
+    RHEE_vX = R_heel_vel[:, 0]
+    RTOE_vX = R_toe_vel[:, 0]
 
-    return L_heel_vX, L_toe_vX, R_heel_vX, R_toe_vX
+    return LHEE_vX, LTOE_vX, RHEE_vX, RTOE_vX
 
-def filter_data(L_heel_vX, L_toe_vX, R_heel_vX, R_toe_vX, frame_rate):
+def filter_data(LHEE_vX, LTOE_vX, RHEE_vX, RTOE_vX, frame_rate):
     # 4. Filter data (2nd order Butterworth, 6Hz cutoff)
     b, a = butter(2, 6.0 / (0.5 * frame_rate), btype='low')
-    L_heel_filt = filtfilt(b, a, L_heel_vX)
-    L_toe_filt  = filtfilt(b, a, L_toe_vX)
-    R_heel_filt = filtfilt(b, a, R_heel_vX)
-    R_toe_filt  = filtfilt(b, a, R_toe_vX)
-    return L_heel_filt, L_toe_filt, R_heel_filt, R_toe_filt
+    LHEE_filt = filtfilt(b, a, LHEE_vX)
+    LTOE_filt  = filtfilt(b, a, LTOE_vX)
+    RHEE_filt = filtfilt(b, a, RHEE_vX)
+    RTOE_filt  = filtfilt(b, a, RTOE_vX)
+    return LHEE_filt, LTOE_filt, RHEE_filt, RTOE_filt
 
 def detect_events(L_heel_vX, L_toe_vX, R_heel_vX, R_toe_vX, start_frame=1):
     L_heel_sign = np.sign(L_heel_vX)
