@@ -3,6 +3,7 @@ import ezc3d
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
+from scipy.signal import butter, filtfilt
 from pathlib import Path
 from src.utils.find_project_root import find_project_root
 
@@ -223,8 +224,7 @@ def main(config):
 
     # 2. Get Marker Trajectories
     if(input_type == "vicon"):
-        from scipy.signal import butter, filtfilt
-        from viconnexusapi import ViconNexus
+        from viconnexusapi import ViconNexus # Vicon's proprietary motion-capture SDK
         # Connect to active Vicon Nexus session
         vicon = ViconNexus.ViconNexus()
         # Overwrite necessary variables

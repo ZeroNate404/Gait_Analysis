@@ -1,0 +1,10 @@
+# requirements.txt
+numpy
+matplotlib
+PyYAML
+ezc3d
+scipy
+
+# viconnexusapi is not on PyPI — install manually from your
+# Vicon Nexus SDK installation (see Vicon docs). Only required
+# if input_type == "vicon".
