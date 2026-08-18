@@ -1,11 +1,11 @@
 # config.yaml
 
 input:
-  type: "bmclab"
-  directory: "data\BMCLab\SUB05_off_walk_1.c3d"
+  type: "carepd"
+  directory: "data\\CarePD\\BMCLab_SUB05_off_walk_1_canonical_keypoints_mm.npz"
 
 trial:
-  session: "20260803"
-  name: "SUB05_off_walk_1"
+  session: "20260818"
+  name: "BMCLab_SUB05_off_walk_1_canonical_keypoints_mm"
   start_frame: 100
   end_frame: 1250

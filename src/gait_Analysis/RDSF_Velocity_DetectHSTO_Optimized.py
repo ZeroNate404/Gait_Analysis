@@ -42,31 +42,44 @@ def generalize(metadata, LHEE, LTOE, RHEE, RTOE, SACR):
         SACR *= adjust_units[metadata["units"]]
 
     # Generalize coordinate system orientation
-
-
+    if(metadata["input_type"] == "bmclab"):
+        # BMCLab: X(front) | Y(up) | Z(left)
+        # X' = X
+        # Y' = -Z 
+        # Z' = Y
+        LHEE = np.column_stack((LHEE[0], -LHEE[2])) 
+        LTOE = np.column_stack((LTOE[0], -LTOE[2]))
+        RHEE = np.column_stack((RHEE[0], -RHEE[2]))
+        RTOE = np.column_stack((RTOE[0], -RTOE[2]))
+        SACR = np.column_stack((SACR[0], -SACR[2]))
 
     # Generalize frame rate
+    '''Not yet written'''
+
+    # Return XY trajectories
+    return LHEE, LTOE, RHEE, RTOE, SACR
+
 
 
 def get_vicon_heel_toe_arr(vicon, subject):
     # 2. Get Marker Trajectories
-    L_heel_X, L_heel_Y, _, exist = vicon.GetTrajectory(subject, "LHEE")
-    L_toe_X, L_toe_Y, _, _  = vicon.GetTrajectory(subject, "LTOE")
-    R_heel_X, R_heel_Y, _, _ = vicon.GetTrajectory(subject, "RHEE")
-    R_toe_X, R_toe_Y, _, _  = vicon.GetTrajectory(subject, "RTOE")
-    L_PSI_X, L_PSI_Y, _, _ = vicon.GetTrajectory(subject, "LPSI")
-    R_PSI_X, R_PSI_Y, _, _ = vicon.GetTrajectory(subject, "RPSI")
-    # Stack 1D X and Y arrays into a 2D (N, 2) array
-    L_heel_arr = np.column_stack((L_heel_X, L_heel_Y))
-    L_toe_arr  = np.column_stack((L_toe_X, L_toe_Y))
-    R_heel_arr = np.column_stack((R_heel_X, R_heel_Y))
-    R_toe_arr  = np.column_stack((R_toe_X, R_toe_Y))
-    L_PSI_arr = np.column_stack((L_PSI_X, L_PSI_Y))
-    R_PSI_arr = np.column_stack((R_PSI_X, R_PSI_Y))
+    LHEE_X, LHEE_Y, LHEE_Z, _ = vicon.GetTrajectory(subject, "LHEE")
+    LTOE_X, LTOE_Y, LTOE_Z, _ = vicon.GetTrajectory(subject, "LTOE")
+    RHEE_X, RHEE_Y, RHEE_Z, _ = vicon.GetTrajectory(subject, "RHEE")
+    RTOE_X, RTOE_Y, RTOE_Z, _ = vicon.GetTrajectory(subject, "RTOE")
+    LPSI_X, LPSI_Y, LPSI_Z, _ = vicon.GetTrajectory(subject, "LPSI")
+    RPSI_X, RPSI_Y, RPSI_Z, _ = vicon.GetTrajectory(subject, "RPSI")
+    # Stack 1D X, Y, and Z arrays into a 3D (N, 3) array
+    LHEE_arr = np.column_stack((LHEE_X, LHEE_Y, LHEE_Z))
+    LTOE_arr  = np.column_stack((LTOE_X, LTOE_Y, LTOE_Z))
+    RHEE_arr = np.column_stack((RHEE_X, RHEE_Y, RHEE_Z))
+    RTOE_arr  = np.column_stack((RTOE_X, RTOE_Y, RTOE_Z))
+    LPSI_arr = np.column_stack((LPSI_X, LPSI_Y, LPSI_Z))
+    RPSI_arr = np.column_stack((RPSI_X, RPSI_Y, RPSI_Z))
     # Calculate Sacrum as the midpoint: S = (LPSI + RPSI) / 2
-    sacrum_arr = (L_PSI_arr + R_PSI_arr) / 2.0
+    SACR_arr = (LPSI_arr + RPSI_arr) / 2.0
 
-    return L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr, sacrum_arr
+    return LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr, SACR_arr
 
 def compute_walk_dir(sacrum_arr, frame_rate):
     dt = 1.0 / frame_rate
@@ -206,7 +219,6 @@ def save_events_npz(input_type, trial_name, session_name, gait_events):
     SAVE_PATH = SAVE_DIR / f"{trial_name}_GaitEvents.npz"
     np.savez(SAVE_PATH, **gait_events)
 
-
 def main(config):
     # 1. Config arguments (INPUT)
     input_type = config["input"]["type"].lower()
@@ -235,7 +247,10 @@ def main(config):
         if(len(sys.argv)>1): start_frame = sys.argv[1]
         if(len(sys.argv)>2): end_frame = sys.argv[2]
         units = "mm"
-        L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr, sacrum_arr = get_vicon_heel_toe_arr(vicon, subject="Oli_2")
+        xyz_orient = {"X": "front", "Y": "right", "Z": "up"}
+
+        # Marker Trajectories (XYZ)
+        LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr, SACR_arr = get_vicon_heel_toe_arr(vicon, subject)
 
     elif(input_type == "bmclab"):
         # Load C3D
@@ -243,18 +258,19 @@ def main(config):
         # Overwrite necessary variables
         frame_rate = c3d_file["header"]["points"]["frame_rate"]
         units = c3d_file["parameters"]["POINT"]["UNITS"]["value"][0]
+        xyz_orient = {"X": "front", "Y": "up", "Z": "left"}
         points = c3d_file["data"]["points"]
         labels = c3d_file["parameters"]["POINT"]["LABELS"]["value"]
         marker_dict = {label:i for i,label in enumerate(labels)}
 
-        # Marker Trajectories
-        L_heel_arr = np.array(points[:3,marker_dict["L.Heel"],start_frame-1:end_frame]) # 1 --> 0 Indexing
-        L_toe_arr = np.array(points[:3,marker_dict["L.MT2"],start_frame-1:end_frame])
-        R_heel_arr = np.array(points[:3,marker_dict["R.Heel"],start_frame-1:end_frame])
-        R_toe_arr = np.array(points[:3,marker_dict["R.MT2"],start_frame-1:end_frame])
-        RPSI = np.array(points[:3,marker_dict["R.PSIS"],start_frame-1:end_frame])
-        LPSI = np.array(points[:3,marker_dict["L.PSIS"],start_frame-1:end_frame])
-        sacrum_arr = (RPSI+LPSI)/2
+        # Marker Trajectories (XYZ)
+        LHEE_arr = np.array(points[:3,marker_dict["L.Heel"],start_frame-1:end_frame]) # 1 --> 0 Indexing
+        LTOE_arr = np.array(points[:3,marker_dict["L.MT2"],start_frame-1:end_frame])
+        RHEE_arr = np.array(points[:3,marker_dict["R.Heel"],start_frame-1:end_frame])
+        RTOE_arr = np.array(points[:3,marker_dict["R.MT2"],start_frame-1:end_frame])
+        RPSI_arr = np.array(points[:3,marker_dict["R.PSIS"],start_frame-1:end_frame])
+        LPSI_arr = np.array(points[:3,marker_dict["L.PSIS"],start_frame-1:end_frame])
+        SACR_arr = (RPSI_arr + LPSI_arr) / 2
 
     elif(input_type == "carepd"):
         # Load NPZ
@@ -262,25 +278,18 @@ def main(config):
         # Overwrite necessary variables
         frame_rate = data["fps"]
         units = data["unit"]
+        xyz_orient = {"X": "front", "Y": "right", "Z": "up"}
         points = data["positions"]
         labels = data["joint_names"]
         marker_dict = {label:i for i,label in enumerate(labels)}
+        start_frame, end_frame = 1, points.shape[0]  # Use all frames in the NPZ file
 
-        # Marker Trajectories
-        L_heel_X, L_heel_Y = points[:,marker_dict["left_heel"],0], points[:,marker_dict["left_heel"],1]
-        L_toe_X, L_toe_Y = points[:,marker_dict["left_big_toe"],0], points[:,marker_dict["left_big_toe"],1]
-        R_heel_X, R_heel_Y = points[:,marker_dict["right_heel"],0], points[:,marker_dict["right_heel"],1]
-        R_toe_X, R_toe_Y = points[:,marker_dict["right_big_toe"],0], points[:,marker_dict["right_big_toe"],1]
-        L_PSI_X, L_PSI_Y = points[:,marker_dict["left_hip"],0], points[:,marker_dict["left_hip"],1]
-        R_PSI_X, R_PSI_Y = points[:,marker_dict["right_hip"],0], points[:,marker_dict["right_hip"],1]
-        # Stack 1D X and Y arrays into a 2D (N, 2) array
-        L_heel_arr = np.column_stack((L_heel_X, L_heel_Y))
-        L_toe_arr  = np.column_stack((L_toe_X, L_toe_Y))
-        R_heel_arr = np.column_stack((R_heel_X, R_heel_Y))
-        R_toe_arr  = np.column_stack((R_toe_X, R_toe_Y))
-        L_PSI_arr = np.column_stack((L_PSI_X, L_PSI_Y))
-        R_PSI_arr = np.column_stack((R_PSI_X, R_PSI_Y))
-        sacrum_arr = (L_PSI_arr + R_PSI_arr) / 2
+        # Marker Trajectories (XYZ)
+        LHEE_arr = np.array(points[:,marker_dict["left_heel"],:])
+        LTOE_arr = np.array(points[:,marker_dict["left_big_toe"],:])
+        RHEE_arr = np.array(points[:,marker_dict["right_heel"],:])
+        RTOE_arr = np.array(points[:,marker_dict["right_big_toe"],:])
+        SACR_arr = np.array(points[:,marker_dict["sacrum"],:])
 
     else: error_msgs.append("Input Type not Specified")
     if(error_msgs): raise InvalidConfigError(error_msgs)
@@ -294,34 +303,36 @@ def main(config):
     '''
     metadata = {"units": units,
                 "frame_rate": frame_rate,
-                "xyz_orientation": xyz_orientation}
-    L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr, sacrum_arr = generalize(metadata, L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr, sacrum_arr)
+                "xyz_orientation": xyz_orient,
+                "input_type": input_type
+                }
+    LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr, SACR_arr = generalize(metadata, LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr, SACR_arr)
 
     # 3. Compute Walking Direction 
-    sacrum_arr_cropped = sacrum_arr[start_frame-1:end_frame] # 1 -> 0 Indexing
-    R, walk_dir = compute_walk_dir(sacrum_arr_cropped, frame_rate)
+    SACR_arr_cropped = SACR_arr[start_frame-1:end_frame] # 1 -> 0 Indexing
+    R, walk_dir = compute_walk_dir(SACR_arr_cropped, frame_rate)
 
     # 4. Transform Coordinates to align with walking direction
-    L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr = align_with_walkdir(L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr, sacrum_arr, R)
+    LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr = align_with_walkdir(LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr, SACR_arr, R)
 
     # 4. Determine velocity/walking direction
-    L_heel_vX, L_toe_vX, R_heel_vX, R_toe_vX = compute_projected_velocity(L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr, frame_rate)
+    LHEE_vX, LTOE_vX, RHEE_vX, RTOE_vX = compute_projected_velocity(LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr, frame_rate)
 
     # 5. Filter data (2nd order Butterworth, 6Hz cutoff)(Optional)
-    # L_heel_vX, L_toe_vX, R_heel_vX, R_toe_vX = filter_data(L_heel_vX, L_toe_vX, R_heel_vX, R_toe_vX, frame_rate)
+    # LHEE_vX, LTOE_vX, RHEE_vX, RTOE_vX = filter_data(LHEE_vX, LTOE_vX, RHEE_vX, RTOE_vX, frame_rate)
 
     # 6. Detect Heel Strike (+ to - velocity) and Toe Off (- to + velocity) events
-    L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs = detect_events(L_heel_vX[start_frame-1:end_frame], # Crop to specified frame range
-                                                                           L_toe_vX[start_frame-1:end_frame], 
-                                                                           R_heel_vX[start_frame-1:end_frame], 
-                                                                           R_toe_vX[start_frame-1:end_frame], 
+    L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs = detect_events(LHEE_vX[start_frame-1:end_frame], # Crop to specified frame range
+                                                                           LTOE_vX[start_frame-1:end_frame], 
+                                                                           RHEE_vX[start_frame-1:end_frame], 
+                                                                           RTOE_vX[start_frame-1:end_frame], 
                                                                            start_frame)
 
     # 7. Visualize Events to Matplotlib
-    visualize_matplotlib(L_heel_vX[start_frame-1:end_frame], 
-                         L_toe_vX[start_frame-1:end_frame], 
-                         R_heel_vX[start_frame-1:end_frame], 
-                         R_toe_vX[start_frame-1:end_frame],
+    visualize_matplotlib(LHEE_vX[start_frame-1:end_frame], 
+                         LTOE_vX[start_frame-1:end_frame], 
+                         RHEE_vX[start_frame-1:end_frame], 
+                         RTOE_vX[start_frame-1:end_frame],
                          L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs, start_frame, end_frame)
     # 8. Write Events to Vicon Nexus
     if(input_type == "vicon"):
@@ -335,17 +346,17 @@ def main(config):
         "end_frame": end_frame,
 
         "walk_dir" : walk_dir,
-        "sacrum_arr": sacrum_arr,
+        "sacrum_arr": SACR_arr,
 
-        "LHarr": L_heel_arr, # frames [1,N]
-        "LTarr": L_toe_arr,
-        "RHarr": R_heel_arr,
-        "RTarr": R_toe_arr,
+        "LHarr": LHEE_arr, # frames [1,N]
+        "LTarr": LTOE_arr,
+        "RHarr": RHEE_arr,
+        "RTarr": RTOE_arr,
 
-        "LHvX": L_heel_vX, # frames [1,N]
-        "LTvX": L_toe_vX,
-        "RHvX": R_heel_vX,
-        "RTvX": R_toe_vX,  
+        "LHvX": LHEE_vX, # frames [1,N]
+        "LTvX": LTOE_vX,
+        "RHvX": RHEE_vX,
+        "RTvX": RTOE_vX,  
         
         "LHS": L_heel_strikes,
         "RHS": R_heel_strikes,

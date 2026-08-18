@@ -9,21 +9,36 @@ c3d = ezc3d.c3d(r"data\BMCLab\SUB05_off_walk_1.c3d")
 # Marker trajectories
 frame_rate = c3d["header"]["points"]["frame_rate"]
 units = c3d["parameters"]["POINT"]["UNITS"]["value"][0]
+
 points = c3d["data"]["points"]
+points_standardized = points.copy()
+points_standardized[0] = points[0]       # X_new = X_old
+points_standardized[1] = -points[2]      # Y_new = -Z_old
+points_standardized[2] = points[1]       # Z_new = Y_old
+
 labels = c3d["parameters"]["POINT"]["LABELS"]["value"]
 marker_dict = {label: i for i, label in enumerate(labels)}
 
-print(f"Frame rate: {frame_rate}")
-print(f"XYZ Coordinates units : {units}")
-print(f"Marker labels: {labels}")
+# for key in c3d["parameters"]["ANALOG"]["__METADATA__"].keys(): print(key)
+# print(c3d["parameters"]["ANALOG"]["__METADATA__"]["DESCRIPTION"])
 
-print(f"XYZ Coordinates shape : {points.shape}")
-print(f"Number of markers: {points.shape[1]}")
-print(f"Number of frames: {points.shape[2]}")
+for group_name, group in c3d["parameters"].items():
+    print(f"\n===== {group_name} =====")
+
+    for param_name, param in group.items():
+        print(f"{param_name}: {param}")
+
+# print(f"Frame rate: {frame_rate}")
+# print(f"XYZ Coordinates units : {units}")
+# print(f"Marker labels: {labels}")
+
+# print(f"XYZ Coordinates shape : {points.shape}")
+# print(f"Number of markers: {points.shape[1]}")
+# print(f"Number of frames: {points.shape[2]}")
 
 # Create figure
-n_frames = points.shape[2]
-xyz = points[:3, :, :]
+n_frames = points_standardized.shape[2]
+xyz = points_standardized[:3, :, :]
 fig = plt.figure()
 ax = fig.add_subplot(111, projection="3d")
 
@@ -42,6 +57,8 @@ ax.set_zlim(np.nanmin(xyz[2])-100, np.nanmax(xyz[2])+100)
 ax.set_xlabel("X (mm)")
 ax.set_ylabel("Y (mm)")
 ax.set_zlabel("Z (mm)")
+
+ax.set_box_aspect([1, 1, 1])
 
 
 def update(frame):

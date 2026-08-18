@@ -1,4 +1,5 @@
-DONT_CHANGE = 3
-print(DONT_CHANGE)
-DONT_CHANGE = 5
-print(DONT_CHANGE)
+import numpy as np
+
+data = np.load("data\\CarePD\\BMCLab_SUB05_off_walk_1_canonical_keypoints_mm.npz")
+for key in data[joint_names]:
+    print(key)
