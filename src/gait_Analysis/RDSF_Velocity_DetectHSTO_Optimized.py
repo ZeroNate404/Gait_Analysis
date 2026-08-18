@@ -3,7 +3,8 @@ import ezc3d
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
-
+from pathlib import Path
+from src.utils.find_project_root import find_project_root
 
 '''
 ===================INPUT===================================
@@ -187,12 +188,14 @@ def nexus_write_events(vicon, subject, L_heel_strikes, L_toe_offs, R_heel_strike
     print(f"Successfully created {len(L_toe_offs)} Left Toe Offs and {len(R_toe_offs)} Right Toe Offs.")
 
 def save_events_npz(input_type, trial_name, session_name, gait_events):
-    save_dir = rf"data\GaitEvents\{input_type}"
-    if(input_type == "vicon"):
-        save_dir = os.path.join(save_dir, session_name)
-    os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, f"{trial_name}_GaitEvents.npz")
-    np.savez(save_path, **gait_events)
+    PROJECT_ROOT = find_project_root()
+    SAVE_DIR = PROJECT_ROOT / "data" / "GaitEvents" / input_type
+    if input_type == "vicon":
+        SAVE_DIR = SAVE_DIR / session_name
+    SAVE_DIR.mkdir(parents=True, exist_ok=True)
+    SAVE_PATH = SAVE_DIR / f"{trial_name}_GaitEvents.npz"
+    np.savez(SAVE_PATH, **gait_events)
+
 
 def main(config):
     # 1. Config arguments (INPUT)
@@ -345,9 +348,6 @@ def main(config):
         gait_events["Subject_name"] = subject
 
     save_events_npz(input_type, trial_name, session_name, gait_events)
-
-    # 9. Compute Gait Parameters (Optional)
-    # gp.compute_gait_params(trial_name, session_name)
 
 class InvalidConfigError(Exception):
     def __init__(self, error_msgs):

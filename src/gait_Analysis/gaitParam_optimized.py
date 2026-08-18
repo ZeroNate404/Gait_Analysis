@@ -1,7 +1,9 @@
 import os, yaml
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 from Visualize_Param import plot_gait_summary, plot_gait_cycle_phases
+from utils.find_project_root import find_project_root
 
 def get_speed(sacrum_arr, total_time):
     # Calculate the total cumulative sacrum displacements as path length
@@ -150,10 +152,13 @@ def compute_gait_params(config):
     if(error_msgs): raise InvalidConfigError
 
     # Extract GaitEvents file
-    if(input_type == "vicon"):
-        data = np.load(f"data\\GaitEvents\\{input_type}\\{session_name}\\{trial_name}_GaitEvents.npz")
-    else:
-        data = np.load(f"data\\GaitEvents\\{input_type}\\{trial_name}_GaitEvents.npz")
+    PROJECT_ROOT = find_project_root()
+    INPUT_DIR = PROJECT_ROOT / "data" / "GaitEvents" / input_type
+    if input_type == "vicon": INPUT_DIR = INPUT_DIR / session_name / f"{trial_name}_GaitEvents.npz"
+    else: INPUT_DIR = INPUT_DIR / f"{trial_name}_GaitEvents.npz"
+    data = np.load(INPUT_DIR)
+
+    # Get gait events and other relevant data from the loaded file
     L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr = data['LHarr'], data['LTarr'], data['RHarr'], data['RTarr']
     L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs = data['LHS'], data['LTO'], data['RHS'], data['RTO']
     sacrum_arr = data['sacrum_arr']
@@ -327,14 +332,14 @@ def compute_gait_params(config):
             "%" : (double_support_time / total_time) * 100
         }
     }
-    if(input_type == "vicon"):
-        save_dir = rf"data\GaitParams\{input_type}\{session_name}"
-    else:
-        save_dir = rf"data\GaitParams\{input_type}"
-    os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, f"{trial_name}_GaitParams.npz")
-    np.savez(save_path, **gait_params)
+    # Save the Computed Gait Parameters
+    SAVE_DIR = PROJECT_ROOT / "data" / "GaitParams" / input_type
+    if input_type == "vicon": SAVE_DIR = SAVE_DIR / session_name
+    SAVE_DIR.mkdir(parents=True, exist_ok=True)
+    SAVE_PATH = SAVE_DIR / f"{trial_name}_GaitParams.npz"
+    np.savez(SAVE_PATH, **gait_params)
 
+    # Visualize the acquired gait parameters
     plot_gait_summary(config)
     plot_gait_cycle_phases(config)
 

@@ -2,6 +2,7 @@ import os
 import numpy as np
 import gaitParam_optimized as gp
 from viconnexusapi import ViconNexus
+from utils.find_project_root import find_project_root
 
 
 def main():
@@ -12,10 +13,16 @@ def main():
     trial_path, trial_name = vicon.GetTrialName()
     input_type = "Vicon"
     session_name = os.path.basename(os.path.normpath(trial_path))
- 
-    file_path = f"D:\\python_scripts\\Gait_Analysis\\data\\GaitEvents\\{input_type}\\{session_name}\\{trial_name}_GaitEvents.npz"
+
+    PROJECT_ROOT = find_project_root()
+    INPUT_DIR = PROJECT_ROOT / "data" / "GaitEvents" / input_type
+    if input_type == "vicon":
+        INPUT_DIR = INPUT_DIR / session_name
+    INPUT_DIR.mkdir(parents=True, exist_ok=True)
+    INPUT_PATH = INPUT_DIR / f"{trial_name}_GaitEvents.npz"
+    
     # 2. Load existing file into a plain dict, then close it
-    npz_file = np.load(file_path, allow_pickle=True)
+    npz_file = np.load(INPUT_PATH, allow_pickle=True)
     data = {key: npz_file[key] for key in npz_file.files}
     npz_file.close()
 
@@ -27,9 +34,7 @@ def main():
     data['LTO'] = np.array(LTO[0],dtype=int)
     data['RHS'] = np.array(RHS[0],dtype=int)
     data['RTO'] = np.array(RTO[0],dtype=int)
-    np.savez(file_path, **data)
-
-    # gp.compute_gait_params(trial_name, session_name)  # Compute gait parameters after updating events
+    np.savez(INPUT_PATH, **data)
 
 
 main()
