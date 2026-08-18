@@ -3,7 +3,8 @@ import ezc3d
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
-
+from pathlib import Path
+from src.utils.find_project_root import find_project_root
 
 '''
 ===================INPUT===================================
@@ -21,20 +22,29 @@ for each HEEL STRIKE and TOE OFF detected for both left and right foot.
 '''
 error_msgs = []
 
-def generalize(LHEE,LTOE,RHEE,RTO,SACR):
+def generalize(metadata, LHEE, LTOE, RHEE, RTOE, SACR):
     # GENERALIZE DATA
-    # Generalize measurement units
-    if (units != "mm"):
-        error_msgs.append("UNALIGNED MEASUREMENT UNITS")
+    adjust_units = {"km": 1e6,
+                    "hm": 1e5,
+                    "dam": 1e4,
+                    "m": 1000,
+                    "dm": 100,
+                    "cm": 10,
+                    "mm": 1}
 
-    # Generalize coordinate system
+    # Generalize measurement units
+    if (metadata["units"] != "mm"):
+        LHEE *= adjust_units[metadata["units"]]
+        LTOE *= adjust_units[metadata["units"]]
+        RHEE *= adjust_units[metadata["units"]]
+        RTOE *= adjust_units[metadata["units"]]
+        SACR *= adjust_units[metadata["units"]]
+
+    # Generalize coordinate system orientation
+
 
 
     # Generalize frame rate
-
-    # Raise if ERROR exist
-    if error_msgs:
-        raise InvalidConfigError(error_msgs)
 
 
 def get_vicon_heel_toe_arr(vicon, subject):
@@ -187,12 +197,14 @@ def nexus_write_events(vicon, subject, L_heel_strikes, L_toe_offs, R_heel_strike
     print(f"Successfully created {len(L_toe_offs)} Left Toe Offs and {len(R_toe_offs)} Right Toe Offs.")
 
 def save_events_npz(input_type, trial_name, session_name, gait_events):
-    save_dir = rf"data\GaitEvents\{input_type}"
-    if(input_type == "vicon"):
-        save_dir = os.path.join(save_dir, session_name)
-    os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, f"{trial_name}_GaitEvents.npz")
-    np.savez(save_path, **gait_events)
+    PROJECT_ROOT = find_project_root()
+    SAVE_DIR = PROJECT_ROOT / "data" / "GaitEvents" / input_type
+    if input_type == "vicon":
+        SAVE_DIR = SAVE_DIR / session_name
+    SAVE_DIR.mkdir(parents=True, exist_ok=True)
+    SAVE_PATH = SAVE_DIR / f"{trial_name}_GaitEvents.npz"
+    np.savez(SAVE_PATH, **gait_events)
+
 
 def main(config):
     # 1. Config arguments (INPUT)
@@ -203,14 +215,11 @@ def main(config):
     frame_rate = 150                                # May be Overwritten
     start_frame = config["trial"]["start_frame"]    # May be overwritten
     end_frame = config["trial"]["end_frame"]        # May be overwritten
-    units = "" # Will be Overwritten
-    if not input_type or not input_dir:
-        raise InvalidConfigError("Input type and directory must be specified in the configuration.")
-    if not start_frame or not end_frame:
-        raise InvalidConfigError("Start frame and end frame must be specified in the configuration.")
-    if not frame_rate:
-        raise InvalidConfigError("Frame rate must be specified in the configuration.")
-    
+    units = ""                                      # Will be Overwritten
+    if not input_type or not input_dir: error_msgs.append("Input type and directory must be specified in the configuration.")
+    if not start_frame or not end_frame: error_msgs.append("Start frame and end frame must be specified in the configuration.")
+    if not frame_rate: error_msgs.append("Frame rate must be specified in the configuration.")
+    if(error_msgs): raise InvalidConfigError(error_msgs)
 
     # 2. Get Marker Trajectories
     if(input_type == "vicon"):
@@ -273,16 +282,20 @@ def main(config):
         R_PSI_arr = np.column_stack((R_PSI_X, R_PSI_Y))
         sacrum_arr = (L_PSI_arr + R_PSI_arr) / 2
 
-    else:
-        error_msgs.append("Input Type not Specified")
-    # Make sure data is generalized
+    else: error_msgs.append("Input Type not Specified")
+    if(error_msgs): raise InvalidConfigError(error_msgs)
+    
     '''
+    GENERALIZE INPUT METADATA
     Measurement unit        : mm
     World XYZ               : X(front) | Y(right) | Z(up)
     Frame_rate              : 100 Hz
     Time alignment          : First Heel Strike
     '''
-    # L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr, sacrum_arr = generalize(L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr, sacrum_arr)
+    metadata = {"units": units,
+                "frame_rate": frame_rate,
+                "xyz_orientation": xyz_orientation}
+    L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr, sacrum_arr = generalize(metadata, L_heel_arr, L_toe_arr, R_heel_arr, R_toe_arr, sacrum_arr)
 
     # 3. Compute Walking Direction 
     sacrum_arr_cropped = sacrum_arr[start_frame-1:end_frame] # 1 -> 0 Indexing
@@ -345,9 +358,6 @@ def main(config):
         gait_events["Subject_name"] = subject
 
     save_events_npz(input_type, trial_name, session_name, gait_events)
-
-    # 9. Compute Gait Parameters (Optional)
-    # gp.compute_gait_params(trial_name, session_name)
 
 class InvalidConfigError(Exception):
     def __init__(self, error_msgs):

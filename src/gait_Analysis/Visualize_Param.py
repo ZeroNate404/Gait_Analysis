@@ -1,17 +1,22 @@
 import os, yaml
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
+from utils.find_project_root import find_project_root
 
 
 def _load_gait_params(session, trial_name, input_type):
     """Load a saved *_GaitParams.npz file back into a plain nested-dict structure.
     Nested dicts (step_lengths, stance_time, etc.) are saved by np.savez as 0-d
     object arrays, so they need .item() to unwrap back into real dicts."""
+
+    PROJECT_ROOT = find_project_root()
+    INPUT_DIR = PROJECT_ROOT / "data" / "GaitParams" / input_type
     if(input_type == "vicon"):
-        path = rf"D:\python_scripts\Gait_Analysis\data\GaitParams\{input_type}\{session}\{trial_name}_GaitParams.npz"
-    else:
-        path = rf"D:\python_scripts\Gait_Analysis\data\GaitParams\{input_type}\{trial_name}_GaitParams.npz"
-    data = np.load(path, allow_pickle=True)
+        INPUT_DIR = INPUT_DIR / session
+    INPUT_PATH = INPUT_DIR / f"{trial_name}_GaitParams.npz"
+    data = np.load(INPUT_PATH, allow_pickle=True)
+
     gait_params = {}
     for key in data.files:
         val = data[key]
@@ -77,15 +82,17 @@ def plot_gait_summary(config):
                                         transform=ax_scalar.transAxes))
 
     plt.tight_layout()
+
+    # Save visualization graphs
+    PROJECT_ROOT = find_project_root()
+    SAVE_DIR = PROJECT_ROOT / "data" / "GaitReports" / input_type
     if(input_type == "vicon"):
-        save_dir = rf"data\GaitReports\{input_type}\{session}"
-    else:
-        save_dir = rf"data\GaitReports\{input_type}"
-    os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, f"{trial_name}_GaitSummary.png")
-    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        SAVE_DIR = SAVE_DIR / session
+    SAVE_DIR.mkdir(parents=True, exist_ok=True)
+    SAVE_PATH = SAVE_DIR / f"{trial_name}_GaitSummary.png"
+    plt.savefig(SAVE_PATH, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    return save_path
+    return SAVE_PATH
 
 
 def plot_gait_cycle_phases(config):
@@ -125,15 +132,17 @@ def plot_gait_cycle_phases(config):
         ax_pct.text(i, v, f"{v:.1f}%", ha="center", va="bottom", fontsize=8)
 
     plt.tight_layout()
+
+    # Save visualization graphs
+    PROJECT_ROOT = find_project_root()
+    SAVE_DIR = PROJECT_ROOT / "data" / "GaitReports" / input_type
     if(input_type == "vicon"):
-        save_dir = rf"data\GaitReports\{input_type}\{session}"
-    else:
-        save_dir = rf"data\GaitReports\{input_type}"
-    os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, f"{trial_name}_GaitCyclePhases.png")
-    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        SAVE_DIR = SAVE_DIR / session
+    SAVE_DIR.mkdir(parents=True, exist_ok=True)
+    SAVE_PATH = SAVE_DIR / f"{trial_name}_GaitCyclePhases.png"
+    plt.savefig(SAVE_PATH, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    return save_path
+    return SAVE_PATH
 
 class InvalidConfigError(Exception):
     def __init__(self, error_msgs):
