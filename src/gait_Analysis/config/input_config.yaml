@@ -2,10 +2,9 @@
 
 input:
   type: "vicon"
-  directory: "data\\GaitParams\vicon\\20260803\\20260803_sub05_walk01_run1_GaitParams.npz"
 
 trial:
   session: "20260803"
   name: "20260803_sub05_walk01_run1"
-  start_frame:
-  end_frame:
+  start_frame: 330
+  end_frame: 1125

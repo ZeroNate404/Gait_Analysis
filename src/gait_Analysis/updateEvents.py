@@ -1,6 +1,5 @@
 import os
 import numpy as np
-import gaitParam_optimized as gp
 from viconnexusapi import ViconNexus
 from gait_Analysis.utils.find_project_root import find_project_root
 
@@ -11,7 +10,7 @@ def main():
     frame_rate = vicon.GetFrameRate()
     subject = vicon.GetSubjectNames()[0]  # Default to the first subject detected in the session
     trial_path, trial_name = vicon.GetTrialName()
-    input_type = "Vicon"
+    input_type = "vicon"
     session_name = os.path.basename(os.path.normpath(trial_path))
 
     PROJECT_ROOT = find_project_root()

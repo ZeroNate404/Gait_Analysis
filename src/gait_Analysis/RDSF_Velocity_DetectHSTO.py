@@ -1,3 +1,4 @@
+
 import sys, datetime, os, yaml
 import ezc3d
 import numpy as np
@@ -109,20 +110,20 @@ def compute_walk_dir(sacrum_arr, frame_rate):
 
     return R, walk_dir
 
-def align_with_walkdir(LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr, sacrum_arr, R):
+def align_with_walkdir(LHEE_aligned, LTOE_aligned, RHEE_aligned, RTOE_aligned, sacrum_arr, R):
     # Set Sacrum as Origin
-    LHEE_arr -= sacrum_arr
-    LTOE_arr -= sacrum_arr
-    RHEE_arr -= sacrum_arr
-    RTOE_arr -= sacrum_arr
+    LHEE_aligned -= sacrum_arr
+    LTOE_aligned -= sacrum_arr
+    RHEE_aligned -= sacrum_arr
+    RTOE_aligned -= sacrum_arr
 
     # Rotate coordinates by R to align with the walking direction
-    LHEE_arr = LHEE_arr @ R.T
-    LTOE_arr  = LTOE_arr @ R.T
-    RHEE_arr = RHEE_arr @ R.T
-    RTOE_arr  = RTOE_arr @ R.T
+    LHEE_aligned = LHEE_aligned @ R.T
+    LTOE_aligned  = LTOE_aligned @ R.T
+    RHEE_aligned = RHEE_aligned @ R.T
+    RTOE_aligned  = RTOE_aligned @ R.T
 
-    return LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr
+    return LHEE_aligned, LTOE_aligned, RHEE_aligned, RTOE_aligned
 
 def compute_projected_velocity(LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr, frame_rate):
     # Obtain velocity vectors (mm/s)
@@ -178,17 +179,58 @@ def detect_events(L_heel_vX, L_toe_vX, R_heel_vX, R_toe_vX, start_frame=1):
 
     return L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs
 
-def visualize_matplotlib(L_heel_vX, L_toe_vX, R_heel_vX, R_toe_vX, L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs, start_frame, end_frame):
+def visualize_matplotlib(LHEE_vX, LHEE_aligned, LTOE_vX, LTOE_aligned, RHEE_vX, RHEE_aligned, RTOE_vX, 
+                         RTOE_aligned, LHS, LTO, RHS, RTO, start_frame, end_frame):
     # Matplotlib visualization of Velocities and detected events
-    x_frames = np.arange(len(L_heel_vX)) + start_frame
-    plt.plot(x_frames, L_heel_vX, color="blue")
-    plt.plot(x_frames, L_toe_vX, color="green")
-    plt.plot(x_frames, R_heel_vX, color="orange")
-    plt.plot(x_frames, R_toe_vX, color="red")
-    plt.plot(L_heel_strikes, L_heel_vX[L_heel_strikes-start_frame], "x", color="darkblue")
-    plt.plot(R_heel_strikes, R_heel_vX[R_heel_strikes-start_frame], "x", color="darkred")
-    plt.plot(x_frames, np.full_like(x_frames, 0), "--", color="black")
-    plt.xlim(left=start_frame,right=end_frame)
+    x_frames = np.arange(len(LHEE_vX)) + start_frame
+    fig, axs = plt.subplots(2, 2, figsize=(12, 8), sharex=False)
+
+    axs[0, 0].plot(x_frames, LHEE_vX, color="blue", marker="o", markersize=3)
+    axs[0, 0].plot(LHS, LHEE_vX[LHS-start_frame], "x", markersize=8, color="darkblue")
+    for f in LHS: axs[0, 0].annotate(str(f), (f, LHEE_vX[f-start_frame]),
+                            textcoords="offset points", xytext=(-15, -10),
+                            ha="center", fontsize=8, color="darkblue")
+    axs[0, 0].axhline(0, linestyle="--", color="black")
+    axs[0, 0].set_title("Left Heel")
+    axs[0, 0].text(0.5, 0.98, f"Detections at frames = {LHS.tolist()}",
+                   transform=axs[0, 0].transAxes, ha="center", va="top", fontsize=8)
+
+    axs[0, 1].plot(x_frames, LTOE_vX, color="green", marker="o", markersize=3)
+    axs[0, 1].plot(LTO, LTOE_vX[LTO-start_frame], "x", markersize=8, color="darkgreen")
+    for f in LTO: axs[0, 1].annotate(str(f), (f, LTOE_vX[f-start_frame]),
+                            textcoords="offset points", xytext=(-15, 10),
+                            ha="center", fontsize=8, color="darkgreen")
+    axs[0, 1].axhline(0, linestyle="--", color="black")
+    axs[0, 1].set_title("Left Toe")
+    axs[0, 1].text(0.5, 0.98, f"Detections at frames = {LTO.tolist()}",
+                   transform=axs[0, 1].transAxes, ha="center", va="top", fontsize=8)
+
+    axs[1, 0].plot(x_frames, RHEE_vX, color="orange", marker="o", markersize=3)
+    axs[1, 0].plot(RHS, RHEE_vX[RHS-start_frame], "x", markersize=8, color="darkred")
+    for f in RHS: axs[1, 0].annotate(str(f), (f, RHEE_vX[f-start_frame]),
+                            textcoords="offset points", xytext=(-15, -10),
+                            ha="center", fontsize=8, color="darkred")
+    axs[1, 0].axhline(0, linestyle="--", color="black")
+    axs[1, 0].set_title("Right Heel")
+    axs[1, 0].text(0.5, 0.98, f"Detections at frames = {RHS.tolist()}",
+                   transform=axs[1, 0].transAxes, ha="center", va="top", fontsize=8)
+
+    axs[1, 1].plot(x_frames, RTOE_vX, color="red", marker="o", markersize=3)
+    axs[1, 1].plot(RTO, RTOE_vX[RTO-start_frame], "x", markersize=8, color="darkred")
+    for f in RTO: axs[1, 1].annotate(str(f), (f, RTOE_vX[f-start_frame]),
+                            textcoords="offset points", xytext=(-15, 10),
+                            ha="center", fontsize=8, color="darkred")
+    axs[1, 1].axhline(0, linestyle="--", color="black")
+    axs[1, 1].set_title("Right Toe")
+    axs[1, 1].text(0.5, 0.98, f"Detections at frames = {RTO.tolist()}",
+                   transform=axs[1, 1].transAxes, ha="center", va="top", fontsize=8)
+
+    for ax in axs.flat:
+        ax.set_xlim(left=start_frame, right=end_frame)
+        ax.set_xlabel("Frame")
+        ax.set_ylabel("Velocity (mm/s)")
+
+    plt.tight_layout()
     plt.show()
 
 # Write events to Vicon Nexus
@@ -220,26 +262,34 @@ def save_events_npz(input_type, trial_name, session_name, gait_events):
 def main(config):
     # 1. Config arguments (INPUT)
     input_type = config["input"]["type"].lower()
-    input_dir = config["input"]["directory"]
     session_name = config["trial"]["session"]       # May be Overwritten
     trial_name = config["trial"]["name"]            # May be Overwritten
     frame_rate = 150                                # May be Overwritten
     start_frame = config["trial"]["start_frame"]    # May be overwritten
     end_frame = config["trial"]["end_frame"]        # May be overwritten
     units = ""                                      # Will be Overwritten
-    if not input_type or not input_dir: error_msgs.append("Input type and directory must be specified in the configuration.")
     if not start_frame or not end_frame: error_msgs.append("Start frame and end frame must be specified in the configuration.")
     if not frame_rate: error_msgs.append("Frame rate must be specified in the configuration.")
     if(error_msgs): raise InvalidConfigError(error_msgs)
 
+    # Extract Data file
+    PROJECT_ROOT = find_project_root()
+    INPUT_DIR = PROJECT_ROOT / "data" / "Trajectories" / input_type
+    if(input_type == "bmclab")      : INPUT_DIR = INPUT_DIR / f"{trial_name}.c3d"
+    elif(input_type == "carepd")    : INPUT_DIR = INPUT_DIR / f"{trial_name}.npz"
+    elif(input_type == "gmr")       : INPUT_DIR = INPUT_DIR / f"{trial_name}.npz"
+    elif(input_type == "isaaclab")  : INPUT_DIR = INPUT_DIR / f"{trial_name}.npz"
+    elif(input_type == "mujoco")    : INPUT_DIR = INPUT_DIR / f"{trial_name}.npz"
+
     # 2. Get Marker Trajectories
     if(input_type == "vicon"):
-        from viconnexusapi import ViconNexus # Vicon's proprietary motion-capture SDK
         # Connect to active Vicon Nexus session
         vicon = ViconNexus.ViconNexus()
         # Overwrite necessary variables
-        subject = vicon.getSubjectNames()[0]
+        # subject = vicon.GetSubjectNames()[0]
+        subject = "Oli_2"
         trial_path, trial_name = vicon.GetTrialName()
+        print(f"Trial_name : {trial_name}")
         session_name = os.path.basename(os.path.normpath(trial_path))
         frame_rate = vicon.GetFrameRate()
         if(len(sys.argv)>1): start_frame = sys.argv[1]
@@ -252,7 +302,7 @@ def main(config):
 
     elif(input_type == "bmclab"):
         # Load C3D
-        c3d_file = ezc3d.c3d(input_dir)
+        c3d_file = ezc3d.c3d(INPUT_DIR)
         # Overwrite necessary variables
         frame_rate = c3d_file["header"]["points"]["frame_rate"]
         units = c3d_file["parameters"]["POINT"]["UNITS"]["value"][0]
@@ -272,7 +322,7 @@ def main(config):
 
     elif(input_type == "carepd"):
         # Load NPZ
-        data = np.load(input_dir, allow_pickle=True)
+        data = np.load(INPUT_DIR, allow_pickle=True)
         # Overwrite necessary variables
         frame_rate = data["fps"]
         units = data["unit"]
@@ -311,10 +361,10 @@ def main(config):
     R, walk_dir = compute_walk_dir(SACR_arr_cropped, frame_rate)
 
     # 4. Transform Coordinates to align with walking direction
-    LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr = align_with_walkdir(LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr, SACR_arr, R)
-
+    LHEE_aligned, LTOE_aligned, RHEE_aligned, RTOE_aligned = LHEE_arr.copy(), LTOE_arr.copy(), RHEE_arr.copy(), RTOE_arr.copy()  # Create copies to avoid modifying original arrays
+    LHEE_aligned, LTOE_aligned, RHEE_aligned, RTOE_aligned = align_with_walkdir(LHEE_aligned, LTOE_aligned, RHEE_aligned, RTOE_aligned, SACR_arr, R)
     # 4. Determine velocity/walking direction
-    LHEE_vX, LTOE_vX, RHEE_vX, RTOE_vX = compute_projected_velocity(LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr, frame_rate)
+    LHEE_vX, LTOE_vX, RHEE_vX, RTOE_vX = compute_projected_velocity(LHEE_aligned, LTOE_aligned, RHEE_aligned, RTOE_aligned, frame_rate)
 
     # 5. Filter data (2nd order Butterworth, 6Hz cutoff)(Optional)
     # LHEE_vX, LTOE_vX, RHEE_vX, RTOE_vX = filter_data(LHEE_vX, LTOE_vX, RHEE_vX, RTOE_vX, frame_rate)
@@ -327,14 +377,13 @@ def main(config):
                                                                            start_frame)
 
     # 7. Visualize Events to Matplotlib
-    visualize_matplotlib(LHEE_vX[start_frame-1:end_frame], 
-                         LTOE_vX[start_frame-1:end_frame], 
-                         RHEE_vX[start_frame-1:end_frame], 
-                         RTOE_vX[start_frame-1:end_frame],
+    visualize_matplotlib(LHEE_vX[start_frame-1:end_frame], LHEE_aligned[start_frame-1:end_frame],
+                         LTOE_vX[start_frame-1:end_frame], LTOE_aligned[start_frame-1:end_frame],
+                         RHEE_vX[start_frame-1:end_frame], RHEE_aligned[start_frame-1:end_frame],
+                         RTOE_vX[start_frame-1:end_frame], RTOE_aligned[start_frame-1:end_frame],
                          L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs, start_frame, end_frame)
     # 8. Write Events to Vicon Nexus
-    if(input_type == "vicon"):
-        nexus_write_events(vicon, subject, L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs)
+    if(input_type == "vicon"): nexus_write_events(vicon, subject, L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs)
 
     # 9. Save Events to NPZ file
     gait_events = {
@@ -376,6 +425,8 @@ class InvalidConfigError(Exception):
 with open("src/gait_analysis/config/input_config.yaml", "r") as f:
     config = yaml.safe_load(f)
 try:
+    if(config["input"]["type"].lower() == "vicon"):
+        from viconnexusapi import ViconNexus
     main(config)
 except InvalidConfigError as e:
     for msg in e.error_msgs:

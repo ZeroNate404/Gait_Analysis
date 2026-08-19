@@ -11,6 +11,14 @@ dependencies = [
     "scipy",
     "matplotlib",
     "ezc3d",
+    "numpy",
+    "matplotlib",
+    "PyYAML",
+    "ezc3d",
+    "scipy",
+    "pyside6", 
+    "pyqtgraph", 
+    "PyOpenGL",
 ]
 
 [tool.setuptools.packages.find]

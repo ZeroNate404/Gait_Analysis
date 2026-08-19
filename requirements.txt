@@ -4,6 +4,9 @@ matplotlib
 PyYAML
 ezc3d
 scipy
+pyside6 
+pyqtgraph 
+PyOpenGL
 
 # viconnexusapi is not on PyPI — install manually from your
 # Vicon Nexus SDK installation (see Vicon docs). Only required
