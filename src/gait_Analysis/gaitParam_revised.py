@@ -150,7 +150,6 @@ def compute_gait_params(config):
     with np.load(INPUT_DIR) as data:
         # Get gait events and other relevant data from the loaded file
         LHS, LTO, RHS, RTO = (a-1 for a in [data['LHS'], data['LTO'], data['RHS'], data['RTO']]) # 1 -> 0 Indexing
-        LHS = np.delete(LHS, 4)
         sacrum_arr = data['sacrum_arr']
         frame_rate = data['frame_rate']
         if(len(LHS) ==0 or len(RHS) == 0): raise ValueError("No heel strikes detected for one or both feet. Cannot compute gait parameters.")
@@ -206,7 +205,12 @@ def compute_gait_params(config):
             "flags": flags,
             "params": cycle_params
         }
+        # print()
+        # print("===========================================================================================")
+        # print(f"Cycle {s['foot_cycle']} ({stepping_foot}), stepping frame: {s['stepping_frame']}, previous frame: {s['prev_frame']}")
+        # print(f"Anchor foot: {anchor_foot}, Anchor Frame: {s['anchor_frame']}, Anchor Previous Frame: {s['anchor_prev_frame']}")
         gait_params.append(cycle_data)
+
 
     # Save the Computed Gait Parameters to NPZ
     SAVE_DIR = PROJECT_ROOT / "data" / "GaitParams" / input_type

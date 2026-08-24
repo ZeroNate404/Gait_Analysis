@@ -1,10 +1,11 @@
 # config.yaml
 
 input:
-  type: "carepd"
+  type: "vicon"
 
 trial:
-  session: "20260821"
-  name: "BMCLab_SUB05_off_walk_1_canonical_keypoints_mm"
-  start_frame: 330
-  end_frame: 1125
+  dump: True
+  session: "20260804"
+  name: "20260804_sub07_walk01_run1"
+  start_frame: 200
+  end_frame: 1650

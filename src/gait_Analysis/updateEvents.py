@@ -33,6 +33,7 @@ def main():
     data['LTO'] = np.array(LTO[0],dtype=int)
     data['RHS'] = np.array(RHS[0],dtype=int)
     data['RTO'] = np.array(RTO[0],dtype=int)
+    print(f"LHS: {data['LHS']}\nLTO: {data['LTO']}\nRHS: {data['RHS']}\nRTO: {data['RTO']}")
     np.savez(INPUT_PATH, **data)
 
 

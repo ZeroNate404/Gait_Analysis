@@ -1,0 +1,94 @@
+Frame Range of Analysis (NEXUS VICON)
+Norm_walk01_run1: 
+Sub01:
+Walk01:
+Run1 : [290,555]
+Run2 : [300,542]
+Run3 : [245,502]
+Walk02
+Run1 : 
+Run2 : 
+Run3 : 
+Run4 : 
+Walk12
+Run1 : 
+Run2 : 
+Run3 : 
+Walk17
+Run1 : 
+Run2 : 
+Run3 : 
+Sub05:
+Walk01
+Run1 : [330,1125]
+Run2 : [330,1125]
+Run3 : 
+Run4 : [330,1135]
+Walk02
+Run1 : 
+Run2 : 
+Run3 : 
+Walk03
+Run1 : 
+Run2 : 
+Run3 : 
+Walk07
+Run1 : 
+Run2 : 
+Run3 : 
+Walk08
+Run1 : 
+Run2 : 
+Run3 : 
+Sub07:
+Walk01
+Run1 : [180,1650]
+Run2 : [205,1540]
+Run3 : [210,1660]
+Run4 : 
+Run5 : 
+Walk02
+Run1 : 
+Run2 : 
+Run3 : 
+Walk06
+Run1 : 
+Run2 : 
+Run3 : 
+Run4 : 
+Run5 : 
+Walk09
+Run1 : 
+Run2 : 
+Run3 : 
+Walk12
+Run1 : 
+Run2 : 
+Run3 : 
+Sub11
+Walk01
+Run1 : 
+Run2 : 
+Run3 : 
+Walk13
+Run1 : 
+Run2 : 
+Run3 : 
+Run4 : 
+Walk14
+Run1 : 
+Run2 : 
+Run3 : 
+Walk15
+Run1 : 
+Run2 : 
+Run3 : 
+Run4 : 
+Walk18
+Run1 : [345,755]
+Run2 : [275,675]
+Run3 : 
+Walk20
+Run1 : 
+Run2 : 
+Run3 : 

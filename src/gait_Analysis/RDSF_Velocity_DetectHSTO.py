@@ -4,9 +4,10 @@ import ezc3d
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
-from scipy.signal import butter, filtfilt
+from scipy.signal import butter, filtfilt, find_peaks, peak_prominences
 from pathlib import Path
 from gait_Analysis.utils.find_project_root import find_project_root
+from gait_Analysis.utils.otsu_threshold import otsu_threshold, valid_event
 
 '''
 ===================INPUT===================================
@@ -143,7 +144,7 @@ def compute_projected_velocity(LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr, frame_rat
 
 def filter_data(LHEE_vX, LTOE_vX, RHEE_vX, RTOE_vX, frame_rate):
     # 4. Filter data (2nd order Butterworth, 6Hz cutoff)
-    b, a = butter(2, 6.0 / (0.5 * frame_rate), btype='low')
+    b, a = butter(20, 6.0 / (0.5 * frame_rate), btype='low')
     LHEE_filt = filtfilt(b, a, LHEE_vX)
     LTOE_filt  = filtfilt(b, a, LTOE_vX)
     RHEE_filt = filtfilt(b, a, RHEE_vX)
@@ -178,6 +179,12 @@ def detect_events(L_heel_vX, L_toe_vX, R_heel_vX, R_toe_vX, start_frame=1):
     R_toe_offs += start_frame
 
     return L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs
+
+def pass_threshold(events, vX):
+    # events are 1-based frames from detect_events; vX is full-length -> index is E-1
+    threshold = otsu_threshold(vX)
+    filtered_events = valid_event(events - 1, vX, threshold) + 1
+    return filtered_events
 
 def visualize_matplotlib(LHEE_vX, LHEE_aligned, LTOE_vX, LTOE_aligned, RHEE_vX, RHEE_aligned, RTOE_vX, 
                          RTOE_aligned, LHS, LTO, RHS, RTO, start_frame, end_frame):
@@ -250,11 +257,12 @@ def nexus_write_events(vicon, subject, L_heel_strikes, L_toe_offs, R_heel_strike
     print(f"Successfully created {len(L_heel_strikes)} Left Heel Strikes and {len(R_heel_strikes)} Right Heel Strikes.")
     print(f"Successfully created {len(L_toe_offs)} Left Toe Offs and {len(R_toe_offs)} Right Toe Offs.")
 
-def save_events_npz(input_type, trial_name, session_name, gait_events):
+def save_events_npz(input_type, trial_name, session_name, dump, gait_events):
     PROJECT_ROOT = find_project_root()
-    SAVE_DIR = PROJECT_ROOT / "data" / "GaitEvents" / input_type
-    if input_type == "vicon":
-        SAVE_DIR = SAVE_DIR / session_name
+    SAVE_DIR = PROJECT_ROOT / "data" / "GaitEvents"
+    if dump : SAVE_DIR = SAVE_DIR / "dump"
+    SAVE_DIR = SAVE_DIR / input_type
+    if input_type == "vicon": SAVE_DIR = SAVE_DIR / session_name
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
     SAVE_PATH = SAVE_DIR / f"{trial_name}_GaitEvents.npz"
     np.savez(SAVE_PATH, **gait_events)
@@ -262,6 +270,7 @@ def save_events_npz(input_type, trial_name, session_name, gait_events):
 def main(config):
     # 1. Config arguments (INPUT)
     input_type = config["input"]["type"].lower()
+    dump = config["trial"].get("dump", False)  # Default to False if not specified
     session_name = config["trial"]["session"]       # May be Overwritten
     trial_name = config["trial"]["name"]            # May be Overwritten
     frame_rate = 150                                # May be Overwritten
@@ -275,11 +284,11 @@ def main(config):
     # Extract Data file
     PROJECT_ROOT = find_project_root()
     INPUT_DIR = PROJECT_ROOT / "data" / "Trajectories" / input_type
-    if(input_type == "bmclab")      : INPUT_DIR = INPUT_DIR / f"{trial_name}.c3d"
-    elif(input_type == "carepd")    : INPUT_DIR = INPUT_DIR / f"{trial_name}.npz"
-    elif(input_type == "gmr")       : INPUT_DIR = INPUT_DIR / f"{trial_name}.npz"
-    elif(input_type == "isaaclab")  : INPUT_DIR = INPUT_DIR / f"{trial_name}.npz"
-    elif(input_type == "mujoco")    : INPUT_DIR = INPUT_DIR / f"{trial_name}.npz"
+    if(input_type == "bmclab")      : INPUT_PATH = INPUT_DIR / f"{trial_name}.c3d"
+    elif(input_type == "carepd")    : INPUT_PATH = INPUT_DIR / f"{trial_name}.npz"
+    elif(input_type == "gmr")       : INPUT_PATH = INPUT_DIR / f"{trial_name}.npz"
+    elif(input_type == "isaaclab")  : INPUT_PATH = INPUT_DIR / f"{trial_name}.npz"
+    elif(input_type == "mujoco")    : INPUT_PATH = INPUT_DIR / f"{trial_name}.npz"
 
     # 2. Get Marker Trajectories
     if(input_type == "vicon"):
@@ -302,8 +311,9 @@ def main(config):
 
     elif(input_type == "bmclab"):
         # Load C3D
-        c3d_file = ezc3d.c3d(INPUT_DIR)
+        c3d_file = ezc3d.c3d(str(INPUT_PATH))
         # Overwrite necessary variables
+        end_frame = min(end_frame, c3d_file["data"]["points"].shape[2])
         frame_rate = c3d_file["header"]["points"]["frame_rate"]
         units = c3d_file["parameters"]["POINT"]["UNITS"]["value"][0]
         xyz_orient = {"X": "front", "Y": "up", "Z": "left"}
@@ -312,17 +322,17 @@ def main(config):
         marker_dict = {label:i for i,label in enumerate(labels)}
 
         # Marker Trajectories (XYZ)
-        LHEE_arr = np.array(points[:3,marker_dict["L.Heel"],start_frame-1:end_frame]) # 1 --> 0 Indexing
-        LTOE_arr = np.array(points[:3,marker_dict["L.MT2"],start_frame-1:end_frame])
-        RHEE_arr = np.array(points[:3,marker_dict["R.Heel"],start_frame-1:end_frame])
-        RTOE_arr = np.array(points[:3,marker_dict["R.MT2"],start_frame-1:end_frame])
-        RPSI_arr = np.array(points[:3,marker_dict["R.PSIS"],start_frame-1:end_frame])
-        LPSI_arr = np.array(points[:3,marker_dict["L.PSIS"],start_frame-1:end_frame])
+        LHEE_arr = np.array(points[:3,marker_dict["L.Heel"],:]) # 1 --> 0 Indexing
+        LTOE_arr = np.array(points[:3,marker_dict["L.MT2"],:]) # 1 --> 0 Indexing
+        RHEE_arr = np.array(points[:3,marker_dict["R.Heel"],:]) # 1 --> 0 Indexing
+        RTOE_arr = np.array(points[:3,marker_dict["R.MT2"],:]) # 1 --> 0 Indexing
+        RPSI_arr = np.array(points[:3,marker_dict["R.PSIS"],:]) # 1 --> 0 Indexing
+        LPSI_arr = np.array(points[:3,marker_dict["L.PSIS"],:]) # 1 --> 0 Indexing
         SACR_arr = (RPSI_arr + LPSI_arr) / 2
 
     elif(input_type == "carepd"):
         # Load NPZ
-        data = np.load(INPUT_DIR, allow_pickle=True)
+        data = np.load(INPUT_PATH, allow_pickle=True)
         # Overwrite necessary variables
         frame_rate = data["fps"]
         units = data["unit"]
@@ -375,6 +385,14 @@ def main(config):
                                                                            RHEE_vX[start_frame-1:end_frame], 
                                                                            RTOE_vX[start_frame-1:end_frame], 
                                                                            start_frame)
+    print(f"LHS: {L_heel_strikes}\nLTO: {L_toe_offs}\nRHS: {R_heel_strikes}\nRTO: {R_toe_offs}")
+
+    # Otsu Thresholding to remove false detections
+    L_heel_strikes = pass_threshold(L_heel_strikes, LHEE_vX)
+    L_toe_offs     = pass_threshold(L_toe_offs, LTOE_vX)
+    R_heel_strikes = pass_threshold(R_heel_strikes, RHEE_vX)
+    R_toe_offs     = pass_threshold(R_toe_offs, RTOE_vX)
+    print(f"After Otsu Thresholding:\nLHS: {L_heel_strikes}\nLTO: {L_toe_offs}\nRHS: {R_heel_strikes}\nRTO: {R_toe_offs}")
 
     # 7. Visualize Events to Matplotlib
     visualize_matplotlib(LHEE_vX[start_frame-1:end_frame], LHEE_aligned[start_frame-1:end_frame],
@@ -414,8 +432,7 @@ def main(config):
         gait_events["Run_name"] = trial_name
         gait_events["Session_name"] = session_name
         gait_events["Subject_name"] = subject
-
-    save_events_npz(input_type, trial_name, session_name, gait_events)
+    save_events_npz(input_type, trial_name, session_name, dump, gait_events)
 
 class InvalidConfigError(Exception):
     def __init__(self, error_msgs):
