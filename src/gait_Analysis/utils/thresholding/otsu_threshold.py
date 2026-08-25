@@ -92,3 +92,9 @@ def pass_otsu(event, values):
         else:
             print(f"Event {ev} with value {values[ev]} is above threshold {threshold}")
     return event[values[event] >= threshold]
+
+def pass_acc_threshold(events, vX, frame_rate):
+    dt = 1.0/frame_rate
+    accelerations = abs(np.gradient(vX, dt, axis=0))
+    passed_events = pass_otsu(events - 1, accelerations) + 1
+    return passed_events

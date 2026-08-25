@@ -145,9 +145,9 @@ def compute_gait_params(config):
     # Extract GaitEvents file
     PROJECT_ROOT = find_project_root()
     INPUT_DIR = PROJECT_ROOT / "data" / "GaitEvents" / input_type
-    if input_type == "vicon": INPUT_DIR = INPUT_DIR / session_name / f"{trial_name}_GaitEvents.npz"
-    else: INPUT_DIR = INPUT_DIR / f"{trial_name}_GaitEvents.npz"
-    with np.load(INPUT_DIR) as data:
+    if input_type == "vicon": INPUT_PATH = INPUT_DIR / session_name / f"{trial_name}_GaitEvents.npz"
+    else: INPUT_PATH = INPUT_DIR / f"{trial_name}_GaitEvents.npz"
+    with np.load(INPUT_PATH) as data:
         # Get gait events and other relevant data from the loaded file
         LHS, LTO, RHS, RTO = (a-1 for a in [data['LHS'], data['LTO'], data['RHS'], data['RTO']]) # 1 -> 0 Indexing
         sacrum_arr = data['sacrum_arr']

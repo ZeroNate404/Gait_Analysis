@@ -9,3 +9,7 @@ trial:
   name: "20260804_sub07_walk01_run1"
   start_frame: 200
   end_frame: 1650
+
+compare:
+  type: "bmclab"
+  name: "SUB07_off_walk_1"

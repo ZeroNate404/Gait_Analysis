@@ -7,11 +7,11 @@ import matplotlib.patheffects as pe
 import warnings
 from scipy.signal import butter, filtfilt, find_peaks, peak_prominences
 from pathlib import Path
+from gait_Analysis.utils.vicon.get_marker_traj import get_vicon_heel_toe_arr
 from gait_Analysis.utils.find_project_root import find_project_root
-from gait_Analysis.utils.lprom_threshold import lprom_threshold, valid_event, sacrum_speed
-from gait_Analysis.utils.otsu_threshold import otsu_threshold, pass_otsu
-
-OUTLINE = [pe.withStroke(linewidth=3, foreground="white")]
+from gait_Analysis.utils.thresholding.lprom_threshold import pass_lprom_threshold
+from gait_Analysis.utils.thresholding.otsu_threshold import pass_acc_threshold
+from gait_Analysis.utils.visualizer.matplotlib_vis import visualize_matplotlib
 
 '''
 ===================INPUT===================================
@@ -64,26 +64,6 @@ def generalize(metadata, LHEE, LTOE, RHEE, RTOE, SACR):
 
     # Return XY trajectories
     return LHEE[:, :2], LTOE[:, :2], RHEE[:, :2], RTOE[:, :2], SACR[:, :2] # Take only XY
-
-def get_vicon_heel_toe_arr(vicon, subject):
-    # 2. Get Marker Trajectories
-    LHEE_X, LHEE_Y, LHEE_Z, _ = vicon.GetTrajectory(subject, "LHEE")
-    LTOE_X, LTOE_Y, LTOE_Z, _ = vicon.GetTrajectory(subject, "LTOE")
-    RHEE_X, RHEE_Y, RHEE_Z, _ = vicon.GetTrajectory(subject, "RHEE")
-    RTOE_X, RTOE_Y, RTOE_Z, _ = vicon.GetTrajectory(subject, "RTOE")
-    LPSI_X, LPSI_Y, LPSI_Z, _ = vicon.GetTrajectory(subject, "LPSI")
-    RPSI_X, RPSI_Y, RPSI_Z, _ = vicon.GetTrajectory(subject, "RPSI")
-    # Stack 1D X, Y, and Z arrays into a 3D (N, 3) array
-    LHEE_arr = np.column_stack((LHEE_X, LHEE_Y, LHEE_Z))
-    LTOE_arr  = np.column_stack((LTOE_X, LTOE_Y, LTOE_Z))
-    RHEE_arr = np.column_stack((RHEE_X, RHEE_Y, RHEE_Z))
-    RTOE_arr  = np.column_stack((RTOE_X, RTOE_Y, RTOE_Z))
-    LPSI_arr = np.column_stack((LPSI_X, LPSI_Y, LPSI_Z))
-    RPSI_arr = np.column_stack((RPSI_X, RPSI_Y, RPSI_Z))
-    # Calculate Sacrum as the midpoint: S = (LPSI + RPSI) / 2
-    SACR_arr = (LPSI_arr + RPSI_arr) / 2.0
-
-    return LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr, SACR_arr
 
 def compute_walk_dir(sacrum_arr, frame_rate):
     dt = 1.0 / frame_rate
@@ -183,76 +163,6 @@ def detect_events(L_heel_vX, L_toe_vX, R_heel_vX, R_toe_vX, start_frame=1):
     R_toe_offs += start_frame
 
     return L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs
-
-def pass_lprom_threshold(events, vX, SACR_speeds=None):
-    # events are 1-based frames from detect_events; vX is full-length -> index is E-1
-    threshold = lprom_threshold(vX, speed=SACR_speeds)
-    filtered_events = valid_event(events - 1, vX, threshold, speed=SACR_speeds) + 1
-    return filtered_events
-
-def pass_acc_threshold(events, vX, frame_rate):
-    dt = 1.0/frame_rate
-    accelerations = abs(np.gradient(vX, dt, axis=0))
-    passed_events = pass_otsu(events - 1, accelerations) + 1
-    return passed_events
-
-def visualize_matplotlib(LHEE_vX, LHEE_aligned, LTOE_vX, LTOE_aligned, RHEE_vX, RHEE_aligned, RTOE_vX, 
-                         RTOE_aligned, LHS, LTO, RHS, RTO, start_frame, end_frame):
-    # Matplotlib visualization of Velocities and detected events
-    x_frames = np.arange(len(LHEE_vX)) + start_frame
-    fig, axs = plt.subplots(2, 2, figsize=(12, 8), sharex=False)
-
-    axs[0, 0].plot(x_frames, LHEE_vX, color="blue", marker="o", markersize=3)
-    axs[0, 0].plot(LHS, LHEE_vX[LHS-start_frame], "x", markersize=8, color="darkblue")
-    for f in LHS: axs[0, 0].annotate(str(f), (f, LHEE_vX[f-start_frame]),
-                            textcoords="offset points", xytext=(-15, -10),
-                            ha="center", fontsize=8, color="darkblue",
-                            path_effects=OUTLINE, zorder=5)
-    axs[0, 0].axhline(0, linestyle="--", color="black")
-    axs[0, 0].set_title("Left Heel")
-    axs[0, 0].text(0.5, 0.98, f"Detections at frames = {LHS.tolist()}",
-                   transform=axs[0, 0].transAxes, ha="center", va="top", fontsize=8)
-
-    axs[0, 1].plot(x_frames, LTOE_vX, color="green", marker="o", markersize=3)
-    axs[0, 1].plot(LTO, LTOE_vX[LTO-start_frame], "x", markersize=8, color="darkgreen")
-    for f in LTO: axs[0, 1].annotate(str(f), (f, LTOE_vX[f-start_frame]),
-                            textcoords="offset points", xytext=(-15, 10),
-                            ha="center", fontsize=8, color="darkgreen",
-                            path_effects=OUTLINE, zorder=5)
-    axs[0, 1].axhline(0, linestyle="--", color="black")
-    axs[0, 1].set_title("Left Toe")
-    axs[0, 1].text(0.5, 0.98, f"Detections at frames = {LTO.tolist()}",
-                   transform=axs[0, 1].transAxes, ha="center", va="top", fontsize=8)
-
-    axs[1, 0].plot(x_frames, RHEE_vX, color="orange", marker="o", markersize=3)
-    axs[1, 0].plot(RHS, RHEE_vX[RHS-start_frame], "x", markersize=8, color="darkred")
-    for f in RHS: axs[1, 0].annotate(str(f), (f, RHEE_vX[f-start_frame]),
-                            textcoords="offset points", xytext=(-15, -10),
-                            ha="center", fontsize=8, color="darkred",
-                            path_effects=OUTLINE, zorder=5)
-    axs[1, 0].axhline(0, linestyle="--", color="black")
-    axs[1, 0].set_title("Right Heel")
-    axs[1, 0].text(0.5, 0.98, f"Detections at frames = {RHS.tolist()}",
-                   transform=axs[1, 0].transAxes, ha="center", va="top", fontsize=8)
-
-    axs[1, 1].plot(x_frames, RTOE_vX, color="red", marker="o", markersize=3)
-    axs[1, 1].plot(RTO, RTOE_vX[RTO-start_frame], "x", markersize=8, color="darkred")
-    for f in RTO: axs[1, 1].annotate(str(f), (f, RTOE_vX[f-start_frame]),
-                            textcoords="offset points", xytext=(-15, 10),
-                            ha="center", fontsize=8, color="darkred",
-                            path_effects=OUTLINE, zorder=5)
-    axs[1, 1].axhline(0, linestyle="--", color="black")
-    axs[1, 1].set_title("Right Toe")
-    axs[1, 1].text(0.5, 0.98, f"Detections at frames = {RTO.tolist()}",
-                   transform=axs[1, 1].transAxes, ha="center", va="top", fontsize=8)
-
-    for ax in axs.flat:
-        ax.set_xlim(left=start_frame, right=end_frame)
-        ax.set_xlabel("Frame")
-        ax.set_ylabel("Velocity (mm/s)")
-
-    plt.tight_layout()
-    plt.show()
 
 # Write events to Vicon Nexus
 def nexus_write_events(vicon, subject, L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs):

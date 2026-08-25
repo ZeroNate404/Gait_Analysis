@@ -235,7 +235,12 @@ def valid_event(events, vX, threshold, speed=None, frac=0.30):
                 kept.append(int(window[-1]))                # last before peak
  
     return np.array(sorted(kept), dtype=ev.dtype)
- 
+
+def pass_lprom_threshold(events, vX, SACR_speeds=None):
+    # events are 1-based frames from detect_events; vX is full-length -> index is E-1
+    threshold = lprom_threshold(vX, speed=SACR_speeds)
+    filtered_events = valid_event(events - 1, vX, threshold, speed=SACR_speeds) + 1
+    return filtered_events
  
 def sacrum_speed(sacrum_arr, frame_rate):
     """Instantaneous pelvis speed from the sacrum trajectory, for the optional
