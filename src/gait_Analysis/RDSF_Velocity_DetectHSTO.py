@@ -3,11 +3,15 @@ import sys, datetime, os, yaml
 import ezc3d
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as pe
 import warnings
 from scipy.signal import butter, filtfilt, find_peaks, peak_prominences
 from pathlib import Path
 from gait_Analysis.utils.find_project_root import find_project_root
-from gait_Analysis.utils.otsu_threshold import otsu_threshold, valid_event
+from gait_Analysis.utils.lprom_threshold import lprom_threshold, valid_event, sacrum_speed
+from gait_Analysis.utils.otsu_threshold import otsu_threshold, pass_otsu
+
+OUTLINE = [pe.withStroke(linewidth=3, foreground="white")]
 
 '''
 ===================INPUT===================================
@@ -180,11 +184,17 @@ def detect_events(L_heel_vX, L_toe_vX, R_heel_vX, R_toe_vX, start_frame=1):
 
     return L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs
 
-def pass_threshold(events, vX):
+def pass_lprom_threshold(events, vX, SACR_speeds=None):
     # events are 1-based frames from detect_events; vX is full-length -> index is E-1
-    threshold = otsu_threshold(vX)
-    filtered_events = valid_event(events - 1, vX, threshold) + 1
+    threshold = lprom_threshold(vX, speed=SACR_speeds)
+    filtered_events = valid_event(events - 1, vX, threshold, speed=SACR_speeds) + 1
     return filtered_events
+
+def pass_acc_threshold(events, vX, frame_rate):
+    dt = 1.0/frame_rate
+    accelerations = abs(np.gradient(vX, dt, axis=0))
+    passed_events = pass_otsu(events - 1, accelerations) + 1
+    return passed_events
 
 def visualize_matplotlib(LHEE_vX, LHEE_aligned, LTOE_vX, LTOE_aligned, RHEE_vX, RHEE_aligned, RTOE_vX, 
                          RTOE_aligned, LHS, LTO, RHS, RTO, start_frame, end_frame):
@@ -196,7 +206,8 @@ def visualize_matplotlib(LHEE_vX, LHEE_aligned, LTOE_vX, LTOE_aligned, RHEE_vX, 
     axs[0, 0].plot(LHS, LHEE_vX[LHS-start_frame], "x", markersize=8, color="darkblue")
     for f in LHS: axs[0, 0].annotate(str(f), (f, LHEE_vX[f-start_frame]),
                             textcoords="offset points", xytext=(-15, -10),
-                            ha="center", fontsize=8, color="darkblue")
+                            ha="center", fontsize=8, color="darkblue",
+                            path_effects=OUTLINE, zorder=5)
     axs[0, 0].axhline(0, linestyle="--", color="black")
     axs[0, 0].set_title("Left Heel")
     axs[0, 0].text(0.5, 0.98, f"Detections at frames = {LHS.tolist()}",
@@ -206,7 +217,8 @@ def visualize_matplotlib(LHEE_vX, LHEE_aligned, LTOE_vX, LTOE_aligned, RHEE_vX, 
     axs[0, 1].plot(LTO, LTOE_vX[LTO-start_frame], "x", markersize=8, color="darkgreen")
     for f in LTO: axs[0, 1].annotate(str(f), (f, LTOE_vX[f-start_frame]),
                             textcoords="offset points", xytext=(-15, 10),
-                            ha="center", fontsize=8, color="darkgreen")
+                            ha="center", fontsize=8, color="darkgreen",
+                            path_effects=OUTLINE, zorder=5)
     axs[0, 1].axhline(0, linestyle="--", color="black")
     axs[0, 1].set_title("Left Toe")
     axs[0, 1].text(0.5, 0.98, f"Detections at frames = {LTO.tolist()}",
@@ -216,7 +228,8 @@ def visualize_matplotlib(LHEE_vX, LHEE_aligned, LTOE_vX, LTOE_aligned, RHEE_vX, 
     axs[1, 0].plot(RHS, RHEE_vX[RHS-start_frame], "x", markersize=8, color="darkred")
     for f in RHS: axs[1, 0].annotate(str(f), (f, RHEE_vX[f-start_frame]),
                             textcoords="offset points", xytext=(-15, -10),
-                            ha="center", fontsize=8, color="darkred")
+                            ha="center", fontsize=8, color="darkred",
+                            path_effects=OUTLINE, zorder=5)
     axs[1, 0].axhline(0, linestyle="--", color="black")
     axs[1, 0].set_title("Right Heel")
     axs[1, 0].text(0.5, 0.98, f"Detections at frames = {RHS.tolist()}",
@@ -226,7 +239,8 @@ def visualize_matplotlib(LHEE_vX, LHEE_aligned, LTOE_vX, LTOE_aligned, RHEE_vX, 
     axs[1, 1].plot(RTO, RTOE_vX[RTO-start_frame], "x", markersize=8, color="darkred")
     for f in RTO: axs[1, 1].annotate(str(f), (f, RTOE_vX[f-start_frame]),
                             textcoords="offset points", xytext=(-15, 10),
-                            ha="center", fontsize=8, color="darkred")
+                            ha="center", fontsize=8, color="darkred",
+                            path_effects=OUTLINE, zorder=5)
     axs[1, 1].axhline(0, linestyle="--", color="black")
     axs[1, 1].set_title("Right Toe")
     axs[1, 1].text(0.5, 0.98, f"Detections at frames = {RTO.tolist()}",
@@ -242,17 +256,13 @@ def visualize_matplotlib(LHEE_vX, LHEE_aligned, LTOE_vX, LTOE_aligned, RHEE_vX, 
 
 # Write events to Vicon Nexus
 def nexus_write_events(vicon, subject, L_heel_strikes, L_toe_offs, R_heel_strikes, R_toe_offs):
-    for frame in L_heel_strikes: 
-        print(f"Left Heel Strike frame : {frame}")
+    for frame in L_heel_strikes:
         vicon.CreateAnEvent(subject, "Left", "Foot Strike", int(frame), 0.0)
     for frame in R_heel_strikes:
-        print(f"Right Heel Strike frame : {frame}")
         vicon.CreateAnEvent(subject, "Right", "Foot Strike", int(frame), 0.0)
     for frame in L_toe_offs: 
-        print(f"Left Toe Off frame : {frame}")
         vicon.CreateAnEvent(subject, "Left", "Foot Off", int(frame), 0.0)
     for frame in R_toe_offs:
-        print(f"Right Toe Off frame : {frame}")
         vicon.CreateAnEvent(subject, "Right", "Foot Off", int(frame), 0.0)
     print(f"Successfully created {len(L_heel_strikes)} Left Heel Strikes and {len(R_heel_strikes)} Right Heel Strikes.")
     print(f"Successfully created {len(L_toe_offs)} Left Toe Offs and {len(R_toe_offs)} Right Toe Offs.")
@@ -308,11 +318,14 @@ def main(config):
 
         # Marker Trajectories (XYZ)
         LHEE_arr, LTOE_arr, RHEE_arr, RTOE_arr, SACR_arr = get_vicon_heel_toe_arr(vicon, subject)
+        start_frame = max(start_frame, 1)
+        end_frame = min(end_frame, LHEE_arr.shape[0])
 
     elif(input_type == "bmclab"):
         # Load C3D
         c3d_file = ezc3d.c3d(str(INPUT_PATH))
         # Overwrite necessary variables
+        start_frame = max(start_frame,1)
         end_frame = min(end_frame, c3d_file["data"]["points"].shape[2])
         frame_rate = c3d_file["header"]["points"]["frame_rate"]
         units = c3d_file["parameters"]["POINT"]["UNITS"]["value"][0]
@@ -340,8 +353,8 @@ def main(config):
         points = data["positions"]
         labels = data["joint_names"]
         marker_dict = {label:i for i,label in enumerate(labels)}
-        start_frame, end_frame = 1, points.shape[0]  # Use all frames in the NPZ file
-
+        start_frame = max(start_frame, 1)
+        end_frame = min(end_frame, points.shape[0])
         # Marker Trajectories (XYZ)
         LHEE_arr = np.array(points[:,marker_dict["left_heel"],:])
         LTOE_arr = np.array(points[:,marker_dict["left_big_toe"],:])
@@ -387,12 +400,20 @@ def main(config):
                                                                            start_frame)
     print(f"LHS: {L_heel_strikes}\nLTO: {L_toe_offs}\nRHS: {R_heel_strikes}\nRTO: {R_toe_offs}")
 
-    # Otsu Thresholding to remove false detections
-    L_heel_strikes = pass_threshold(L_heel_strikes, LHEE_vX)
-    L_toe_offs     = pass_threshold(L_toe_offs, LTOE_vX)
-    R_heel_strikes = pass_threshold(R_heel_strikes, RHEE_vX)
-    R_toe_offs     = pass_threshold(R_toe_offs, RTOE_vX)
-    print(f"After Otsu Thresholding:\nLHS: {L_heel_strikes}\nLTO: {L_toe_offs}\nRHS: {R_heel_strikes}\nRTO: {R_toe_offs}")
+    # Lprom Otsu Thresholding
+    SACR_speeds = None
+    L_heel_strikes = pass_lprom_threshold(L_heel_strikes  , LHEE_vX, SACR_speeds)
+    L_toe_offs     = pass_lprom_threshold(L_toe_offs      , LTOE_vX, SACR_speeds)
+    R_heel_strikes = pass_lprom_threshold(R_heel_strikes  , RHEE_vX, SACR_speeds)
+    R_toe_offs     = pass_lprom_threshold(R_toe_offs      , RTOE_vX, SACR_speeds)
+    print(f"After Lprom Otsu Thresholding:\nLHS: {L_heel_strikes}\nLTO: {L_toe_offs}\nRHS: {R_heel_strikes}\nRTO: {R_toe_offs}")
+
+    # # Acceleration Otsu Thresholding
+    # L_heel_strikes = pass_acc_threshold(L_heel_strikes, LHEE_vX, frame_rate)
+    # L_toe_offs     = pass_acc_threshold(L_toe_offs, LTOE_vX, frame_rate)
+    # R_heel_strikes = pass_acc_threshold(R_heel_strikes, RHEE_vX, frame_rate)
+    # R_toe_offs     = pass_acc_threshold(R_toe_offs, RTOE_vX, frame_rate)
+    # print(f"After Acceleration Otsu Thresholding:\nLHS: {L_heel_strikes}\nLTO: {L_toe_offs}\nRHS: {R_heel_strikes}\nRTO: {R_toe_offs}")
 
     # 7. Visualize Events to Matplotlib
     visualize_matplotlib(LHEE_vX[start_frame-1:end_frame], LHEE_aligned[start_frame-1:end_frame],
