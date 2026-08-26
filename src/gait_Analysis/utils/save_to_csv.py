@@ -58,6 +58,8 @@ PARAM_ORDER = (
     "step_frames", "step_time",
     "stride_length",
     "stride_frames", "stride_time",
+    "double_step_length",
+    "double_step_frames", "double_step_time",
     "stance_frames", "stance_time",
     "swing_frames", "swing_time",
     "single_support_frames", "single_support_time",

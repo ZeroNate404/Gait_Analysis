@@ -44,28 +44,40 @@ def get_swing_stance_time(stepping_frame, lift_frame, anchor_frame, prev_frame):
     else: stance_frames = lift_frame - prev_frame
     return swing_frames, stance_frames
 
-def get_single_double_support_time(anchor_frame, anchor_lift_frame, stance_frame):
+def get_single_double_support_time(anchor_frame, anchor_lift_frame, stance_frames, flags):
     if(anchor_frame is None or anchor_lift_frame is None): return np.nan, np.nan  # First Step
+    if("ipsilateral_anchor" in flags): return np.nan, stance_frames
     single_support_frames = anchor_frame - anchor_lift_frame
-    double_support_frames = stance_frame - single_support_frames
+    double_support_frames = stance_frames - single_support_frames
     return single_support_frames, double_support_frames
 
-def compute_cycle(data:dict, stepping_data:tuple, lift_data:tuple, anchor_data:tuple, anchor_lift_data:tuple, prev_ipsi:tuple) -> dict:
-    stepping_foot, stepping_frame= stepping_data
-    lift_foot, lift_frame = lift_data
-    anchor_foot, anchor_frame = anchor_data
-    anchor_lift_foot, anchor_lift_frame = anchor_lift_data
-    prev_foot, prev_frame = prev_ipsi
+def compute_cycle(data:dict, step_data:dict, flags:list) -> dict:
+    stepping_foot, stepping_frame= step_data["stepping_foot"], step_data["stepping_frame"]
+    lift_foot, lift_frame = step_data["lift_foot"], step_data["lift_frame"]
+    anchor_foot, anchor_frame = step_data["anchor_foot"], step_data["anchor_frame"]
+    anchor_lift_frame = step_data["anchor_lift_frame"]
+    prev_frame = step_data["prev_frame"]
     HEE_step_arr = data['LHarr'] if stepping_foot == "left" else data['RHarr']
     HEE_anchor_arr = data['RHarr'] if anchor_foot == "right" else data['LHarr']
 
     stride_distance = get_stride_distance(data, stepping_frame, prev_frame)
-    step_length, step_width = get_step_length_width(HEE_step_arr, HEE_anchor_arr, stepping_frame, anchor_frame, prev_frame)
-    step_frames = get_step_time(stepping_frame, anchor_frame)
-    stride_length = get_stride_length(HEE_step_arr, stepping_frame, prev_frame)
-    stride_frames = get_stride_time(stepping_frame, prev_frame)
+    if("ipsilateral_anchor" in flags):
+        step_length, step_width = np.nan, np.nan
+        step_frames = np.nan
+        stride_length = np.nan
+        stride_frames = np.nan
+        double_step_length = get_stride_length(HEE_step_arr, stepping_frame, anchor_frame)
+        double_step_frames = get_stride_time(stepping_frame, anchor_frame)
+    else:
+        step_length, step_width = get_step_length_width(HEE_step_arr, HEE_anchor_arr, stepping_frame, anchor_frame, prev_frame)
+        step_frames = get_step_time(stepping_frame, anchor_frame)
+        stride_length = get_stride_length(HEE_step_arr, stepping_frame, prev_frame)
+        stride_frames = get_stride_time(stepping_frame, prev_frame)
+        double_step_length = np.nan
+        double_step_frames = np.nan
+
     swing_frames, stance_frames = get_swing_stance_time(stepping_frame, lift_frame, anchor_frame, prev_frame)
-    single_support_frames, double_support_frames = get_single_double_support_time(anchor_frame, anchor_lift_frame, stance_frames)
+    single_support_frames, double_support_frames = get_single_double_support_time(anchor_frame, anchor_lift_frame, stance_frames, flags=flags)
 
     # Save to dict
     cycle_params = {}
@@ -76,6 +88,8 @@ def compute_cycle(data:dict, stepping_data:tuple, lift_data:tuple, anchor_data:t
     cycle_params.setdefault("step_frames", {})[stepping_foot] = step_frames
     cycle_params.setdefault("stride_length", {})[stepping_foot] = stride_length
     cycle_params.setdefault("stride_frames", {})[stepping_foot] = stride_frames
+    cycle_params.setdefault("double_step_length", {})[stepping_foot] = double_step_length
+    cycle_params.setdefault("double_step_frames", {})[stepping_foot] = double_step_frames
     cycle_params.setdefault("stance_frames", {})[stepping_foot] = stance_frames
     cycle_params.setdefault("swing_frames", {})[stepping_foot] = swing_frames
     cycle_params.setdefault("single_support_frames", {})[stepping_foot] = single_support_frames
@@ -84,11 +98,7 @@ def compute_cycle(data:dict, stepping_data:tuple, lift_data:tuple, anchor_data:t
     return cycle_params
 
 def build_step_sequence(LHS, RHS):
-    """Merge the two heel-strike series into one chronological step sequence.
-
-    Every index question is answered once, here. Each entry carries the four
-    reference frames the per-cycle computation needs.
-    """
+    """Merge the two heel-strike series into one chronological step sequence."""
     events = sorted(
         [("left", f) for f in LHS] + [("right", f) for f in RHS],
         key=lambda e: e[1],
@@ -177,10 +187,7 @@ def compute_gait_params(config):
     for s in build_step_sequence(LHS, RHS):
         stepping_foot, anchor_foot = s["stepping_foot"], s["anchor_foot"]
         lift_frame = last_before(TO[stepping_foot], s["stepping_frame"], s["prev_frame"])
-        anchor_lift_frame = (
-            last_before(TO[anchor_foot], s["anchor_frame"], s["anchor_prev_frame"])
-            if anchor_foot else None
-        )
+        anchor_lift_frame = last_before(TO[anchor_foot], s["anchor_frame"], s["anchor_prev_frame"]) if anchor_foot else None
 
         flags = []
         if anchor_foot == stepping_foot:
@@ -188,17 +195,11 @@ def compute_gait_params(config):
         if lift_frame is not None and s["anchor_frame"] is not None \
                 and lift_frame < s["anchor_frame"]:
             flags.append("toe_off_before_anchor_hs")    # flight phase or bad event
-
+        s["lift_foot"], s["lift_frame"] = stepping_foot, lift_frame
+        s["anchor_lift_foot"], s["anchor_lift_frame"] = anchor_foot, anchor_lift_frame
         # COMPUTE GAIT PARAMETERS FOR THIS CYCLE
         
-        cycle_params = compute_cycle(
-                        arrays,
-                        (stepping_foot, s["stepping_frame"]),
-                        (stepping_foot, lift_frame),
-                        (anchor_foot, s["anchor_frame"]),
-                        (anchor_foot, anchor_lift_frame),
-                        (stepping_foot, s["prev_frame"]),
-                    )
+        cycle_params = compute_cycle(arrays,s,flags)
         cycle_data = {
             "stepping_foot": stepping_foot,
             "cycle": s["foot_cycle"],

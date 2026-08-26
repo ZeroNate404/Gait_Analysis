@@ -5,11 +5,11 @@ input:
 
 trial:
   dump: True
-  session: "20260804"
-  name: "20260804_sub07_walk01_run1"
-  start_frame: 200
-  end_frame: 1650
+  session: "20260803"
+  name: "20260803_sub05_walk01_run4"
+  start_frame: 330
+  end_frame: 1135
 
 compare:
-  type: "bmclab"
-  name: "SUB07_off_walk_1"
+  type:
+  name:
